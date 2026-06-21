@@ -571,6 +571,25 @@ app.post('/admin/delete/:id', async (c) => {
   return c.redirect('/admin?flash=' + encodeURIComponent('Post deleted.'), 302)
 })
 
+// Quick publish / unpublish toggle
+app.post('/admin/toggle/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const id = parseInt(c.req.param('id'), 10)
+  const post = await Q.getPostById(c.env.DB, id)
+  if (!post) return c.redirect('/admin?flash=' + encodeURIComponent('Post not found.'), 302)
+  await Q.setPostPublished(c.env.DB, id, post.published ? 0 : 1)
+  return c.redirect('/admin?flash=' + encodeURIComponent(post.published ? 'Post unpublished (draft).' : 'Post published.'), 302)
+})
+
+// Duplicate post
+app.post('/admin/duplicate/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const id = parseInt(c.req.param('id'), 10)
+  const newId = await Q.duplicatePost(c.env.DB, id)
+  if (!newId) return c.redirect('/admin?flash=' + encodeURIComponent('Could not duplicate post.'), 302)
+  return c.redirect('/admin/edit/' + newId, 302)
+})
+
 // ============================================================
 // SITEMAP + ROBOTS + RSS
 // ============================================================

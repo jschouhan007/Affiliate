@@ -355,6 +355,43 @@ export async function deletePost(db: D1Database, id: number): Promise<void> {
   await db.prepare('DELETE FROM posts WHERE id = ?').bind(id).run()
 }
 
+// Quick publish/unpublish toggle (dashboard one-click)
+export async function setPostPublished(db: D1Database, id: number, published: number): Promise<void> {
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  await db.prepare('UPDATE posts SET published = ?, updated_at = ? WHERE id = ?').bind(published ? 1 : 0, now, id).run()
+}
+
+// Duplicate a post as an unpublished draft with a unique slug
+export async function duplicatePost(db: D1Database, id: number): Promise<number | null> {
+  const src = await getPostById(db, id)
+  if (!src) return null
+  let base = `${src.slug}-copy`
+  let slug = base
+  let n = 2
+  while (await slugExists(db, slug)) { slug = `${base}-${n++}` }
+  return await createPost(db, {
+    slug,
+    title: `${src.title} (copy)`,
+    excerpt: src.excerpt,
+    dek: src.dek,
+    body: src.body,
+    cover_image: src.cover_image,
+    category_id: src.category_id ?? null,
+    author: src.author,
+    author_role: src.author_role,
+    read_minutes: src.read_minutes ?? null,
+    post_type: src.post_type,
+    pillar: src.pillar,
+    published: 0, // duplicates start as drafts
+    meta_title: src.meta_title,
+    meta_description: src.meta_description,
+    meta_keywords: src.meta_keywords,
+    og_image: src.og_image,
+    canonical_url: src.canonical_url,
+    noindex: src.noindex,
+  })
+}
+
 export async function getRelatedDeals(
   db: D1Database,
   categoryId: number | undefined,

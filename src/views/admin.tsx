@@ -74,21 +74,44 @@ function topbar(active: string): string {
 }
 
 export function AdminDashboard(data: { posts: Post[]; flash?: string }) {
+  const total = data.posts.length
+  const published = data.posts.filter((p) => p.published).length
+  const drafts = total - published
+  const guides = data.posts.filter((p) => p.pillar).length
+
+  const statCard = (label: string, value: number, icon: string, color: string) =>
+    `<div class="card p-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-3xl font-semibold" style="font-family:'Playfair Display',serif">${value}</div>
+          <div class="text-xs text-[#9A8E82] uppercase tracking-wider mt-1">${label}</div>
+        </div>
+        <i class="${icon} text-xl" style="color:${color}"></i>
+      </div>
+    </div>`
+
   const rows = data.posts
     .map(
-      (p) => `<tr class="border-t border-[#2A2622]">
-      <td class="py-3 pr-3">
-        <div class="font-medium text-[#F2EDE7]">${escapeHtml(p.title)}</div>
-        <div class="text-xs text-[#9A8E82]">/blog/${p.slug}</div>
+      (p) => `<tr class="post-row border-t border-[#2A2622] hover:bg-[#1A1816] transition"
+        data-status="${p.published ? 'published' : 'draft'}"
+        data-title="${escapeAttr(p.title.toLowerCase())}"
+        data-slug="${escapeAttr(p.slug.toLowerCase())}">
+      <td class="py-3.5 px-5">
+        <div class="font-medium text-[#F2EDE7] break-words">${escapeHtml(p.title)}</div>
+        <a href="/blog/${p.slug}" target="_blank" class="text-xs text-[#9A8E82] hover:text-[#FB7234] break-all">/blog/${p.slug} <i class="fas fa-arrow-up-right-from-square text-[0.55rem]"></i></a>
       </td>
-      <td class="py-3 pr-3 text-sm text-[#C9BFB5] whitespace-nowrap">${p.category_name || '—'}</td>
-      <td class="py-3 pr-3 text-sm whitespace-nowrap">${p.pillar ? '<span class="text-[#FB7234]">Guide</span>' : `<span class="text-[#9A8E82]">${p.post_type}</span>`}</td>
-      <td class="py-3 pr-3 whitespace-nowrap">${p.published ? '<span class="text-emerald-400 text-xs">● Published</span>' : '<span class="text-amber-400 text-xs">○ Draft</span>'}</td>
-      <td class="py-3 text-right whitespace-nowrap">
-        <a href="/blog/${p.slug}" target="_blank" class="ad-btn ad-line !py-1.5 !px-2.5 text-xs"><i class="fas fa-eye"></i></a>
-        <a href="/admin/edit/${p.id}" class="ad-btn ad-line !py-1.5 !px-2.5 text-xs ml-1">Edit</a>
+      <td class="py-3.5 pr-3 text-sm text-[#C9BFB5] whitespace-nowrap">${p.category_name || '—'}</td>
+      <td class="py-3.5 pr-3 text-sm whitespace-nowrap">${p.pillar ? '<span class="text-[#FB7234]">Guide</span>' : `<span class="text-[#9A8E82] capitalize">${p.post_type}</span>`}</td>
+      <td class="py-3.5 pr-3 whitespace-nowrap">
+        <form method="post" action="/admin/toggle/${p.id}" class="inline">
+          <button title="Click to ${p.published ? 'unpublish' : 'publish'}" class="text-xs cursor-pointer hover:underline ${p.published ? 'text-emerald-400' : 'text-amber-400'}">${p.published ? '● Published' : '○ Draft'}</button>
+        </form>
+      </td>
+      <td class="py-3.5 px-5 text-right whitespace-nowrap">
+        <a href="/admin/edit/${p.id}" class="ad-btn ad-line !py-1.5 !px-2.5 text-xs">Edit</a>
+        <form method="post" action="/admin/duplicate/${p.id}" class="inline"><button title="Duplicate" class="ad-btn ad-line !py-1.5 !px-2.5 text-xs ml-1"><i class="fas fa-copy"></i></button></form>
         <form method="post" action="/admin/delete/${p.id}" class="inline" onsubmit="return confirm('Delete &quot;${escapeAttr(p.title)}&quot;? This cannot be undone.')">
-          <button class="ad-btn ad-danger !py-1.5 !px-2.5 text-xs ml-1"><i class="fas fa-trash"></i></button>
+          <button title="Delete" class="ad-btn ad-danger !py-1.5 !px-2.5 text-xs ml-1"><i class="fas fa-trash"></i></button>
         </form>
       </td>
     </tr>`
@@ -97,21 +120,74 @@ export function AdminDashboard(data: { posts: Post[]; flash?: string }) {
 
   const body = `${topbar('dash')}
   <main class="max-w-5xl mx-auto px-5 py-10">
-    <div class="flex items-center justify-between mb-8">
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-8">
       <div>
-        <h1 class="text-3xl">Posts</h1>
-        <p class="text-[#9A8E82] text-sm mt-1">${data.posts.length} post${data.posts.length === 1 ? '' : 's'} · published &amp; drafts</p>
+        <h1 class="text-3xl">Dashboard</h1>
+        <p class="text-[#9A8E82] text-sm mt-1">Manage your blog posts, drafts &amp; SEO</p>
       </div>
       <a href="/admin/new" class="ad-primary ad-btn"><i class="fas fa-plus"></i> New post</a>
     </div>
-    <div class="card overflow-hidden">
-      <table class="w-full text-sm">
-        <thead><tr class="text-left text-[#9A8E82] text-xs uppercase tracking-wider"><th class="py-3 px-5">Title</th><th>Category</th><th>Type</th><th>Status</th><th></th></tr></thead>
-        <tbody class="px-5">${rows || '<tr><td colspan="5" class="py-10 text-center text-[#9A8E82]">No posts yet.</td></tr>'}</tbody>
-      </table>
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      ${statCard('Total posts', total, 'fas fa-newspaper', '#8ab4f8')}
+      ${statCard('Published', published, 'fas fa-circle-check', '#34d399')}
+      ${statCard('Drafts', drafts, 'fas fa-pen-ruler', '#fbbf24')}
+      ${statCard('Guides', guides, 'fas fa-compass', '#FB7234')}
     </div>
-  </main>`
-  return shell('Posts', body, { flash: data.flash })
+
+    <div class="card overflow-hidden">
+      <div class="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-[#2A2622]">
+        <div class="flex items-center gap-1.5 text-sm" id="status-tabs">
+          <button data-filter="all" class="filter-tab active px-3 py-1.5 rounded-md">All <span class="opacity-60">${total}</span></button>
+          <button data-filter="published" class="filter-tab px-3 py-1.5 rounded-md">Published <span class="opacity-60">${published}</span></button>
+          <button data-filter="draft" class="filter-tab px-3 py-1.5 rounded-md">Drafts <span class="opacity-60">${drafts}</span></button>
+        </div>
+        <div class="relative">
+          <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-xs text-[#6b635a]"></i>
+          <input id="post-search" type="text" placeholder="Search posts…" class="ad-input !py-2 !pl-9 !w-56 text-sm" />
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-[#9A8E82] text-xs uppercase tracking-wider"><th class="py-3 px-5">Title</th><th>Category</th><th>Type</th><th>Status</th><th class="px-5 text-right">Actions</th></tr></thead>
+          <tbody id="posts-tbody">${rows || '<tr><td colspan="5" class="py-12 text-center text-[#9A8E82]">No posts yet. <a href="/admin/new" class="text-[#FB7234] underline">Create your first post →</a></td></tr>'}</tbody>
+        </table>
+        <div id="no-results" class="hidden py-12 text-center text-[#9A8E82]">No posts match your filter.</div>
+      </div>
+    </div>
+  </main>
+  <style>
+    .filter-tab { color:#9A8E82; transition:all .2s; }
+    .filter-tab:hover { color:#E7E2DC; }
+    .filter-tab.active { background:#2A2622; color:#FB7234; }
+  </style>
+  <script>
+  (function(){
+    var search=document.getElementById('post-search');
+    var tabs=document.querySelectorAll('.filter-tab');
+    var rows=Array.prototype.slice.call(document.querySelectorAll('.post-row'));
+    var noRes=document.getElementById('no-results');
+    var filter='all';
+    function apply(){
+      var q=(search.value||'').toLowerCase().trim();
+      var visible=0;
+      rows.forEach(function(r){
+        var matchStatus = filter==='all' || r.dataset.status===filter;
+        var matchText = !q || r.dataset.title.indexOf(q)>-1 || r.dataset.slug.indexOf(q)>-1;
+        var show=matchStatus && matchText;
+        r.style.display = show ? '' : 'none';
+        if(show) visible++;
+      });
+      if(noRes) noRes.classList.toggle('hidden', visible>0 || rows.length===0);
+    }
+    if(search) search.addEventListener('input',apply);
+    tabs.forEach(function(t){ t.addEventListener('click',function(){
+      tabs.forEach(function(x){x.classList.remove('active');});
+      t.classList.add('active'); filter=t.dataset.filter; apply();
+    });});
+  })();
+  </script>`
+  return shell('Dashboard', body, { flash: data.flash })
 }
 
 export function AdminEditor(data: { post?: Post; categories: Category[]; error?: string }) {
