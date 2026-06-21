@@ -50,14 +50,15 @@ function page(c: any, opts: {
 // ============================================================
 app.get('/', async (c) => {
   const db = c.env.DB
-  const [categories, featured, latestDeals, pillars, posts] = await Promise.all([
+  const [categories, featured, latestDeals, pillars, posts, hubs] = await Promise.all([
     Q.getCategories(db),
     Q.getDeals(db, { featured: true, limit: 8 }),
     Q.getDeals(db, { limit: 8 }),
     Q.getPosts(db, { pillar: true, limit: 3 }),
     Q.getPosts(db, { limit: 3 }),
+    Q.getHubs(db),
   ])
-  const body = Pages.HomePage({ categories, featured, latestDeals, pillars, posts })
+  const body = Pages.HomePage({ categories, featured, latestDeals, pillars, posts, hubs })
   return page(c, {
     title: SITE.name,
     canonical: '/',
@@ -116,6 +117,74 @@ app.get('/category/:slug', async (c) => {
     ],
     body,
     categories,
+  })
+})
+
+// ============================================================
+// HUB INDEX + HUB (best-of collections)
+// ============================================================
+app.get('/best', async (c) => {
+  const db = c.env.DB
+  const [categories, hubs] = await Promise.all([Q.getCategories(db), Q.getHubs(db)])
+  const body = Pages.HubIndexPage({ hubs })
+  return page(c, {
+    title: 'Best-Of Collections',
+    description: 'Curated best-of shortlists across mobiles, tech, audio and home — our top-rated, best-value picks for every need.',
+    canonical: '/best',
+    jsonLd: [Schema.breadcrumbSchema([{ name: 'Home', url: '/' }, { name: 'Best Of', url: '/best' }])],
+    body,
+    categories,
+  })
+})
+
+app.get('/best/:slug', async (c) => {
+  const db = c.env.DB
+  const slug = c.req.param('slug')
+  const categories = await Q.getCategories(db)
+  const hub = await Q.getHubBySlug(db, slug)
+  if (!hub) return notFound(c, categories)
+  const [deals, allHubs] = await Promise.all([Q.getHubDeals(db, hub), Q.getHubs(db)])
+  const relatedHubs = allHubs.filter((h) => h.id !== hub.id).slice(0, 3)
+  const sourcePath = `/best/${slug}`
+  const body = Pages.HubPage({ hub, deals, relatedHubs, sourcePath })
+  return page(c, {
+    title: hub.title,
+    description: hub.dek || `Our curated picks: ${hub.title}.`,
+    canonical: sourcePath,
+    jsonLd: [
+      Schema.hubSchema(hub, deals),
+      Schema.breadcrumbSchema([
+        { name: 'Home', url: '/' },
+        { name: 'Best Of', url: '/best' },
+        { name: hub.title, url: sourcePath },
+      ]),
+    ],
+    body,
+    categories,
+  })
+})
+
+// ============================================================
+// COMPARE
+// ============================================================
+app.get('/compare', async (c) => {
+  const db = c.env.DB
+  const categories = await Q.getCategories(db)
+  const idsParam = (c.req.query('ids') || '').trim()
+  const ids = idsParam
+    .split(',')
+    .map((s) => parseInt(s, 10))
+    .filter((n) => Number.isInteger(n) && n > 0)
+    .slice(0, 4)
+  const deals = ids.length ? await Q.getDealsByIds(db, ids) : []
+  const body = Pages.ComparePage({ deals, sourcePath: '/compare' })
+  return page(c, {
+    title: 'Compare Products',
+    description: 'Compare products side by side — price, rating, specs and features.',
+    canonical: '/compare',
+    body,
+    categories,
+    noindex: true,
   })
 })
 
@@ -374,15 +443,17 @@ app.get('/robots.txt', (c) => {
 
 app.get('/sitemap.xml', async (c) => {
   const db = c.env.DB
-  const [categories, deals, posts] = await Promise.all([
+  const [categories, deals, posts, hubs] = await Promise.all([
     Q.getCategories(db),
     Q.getDeals(db, { limit: 1000 }),
     Q.getPosts(db, { limit: 1000 }),
+    Q.getHubs(db),
   ])
-  const staticUrls = ['', '/deals', '/blog', '/guides', '/about', '/contact', '/affiliate-disclosure', '/privacy-policy', '/terms-of-service']
+  const staticUrls = ['', '/deals', '/best', '/blog', '/guides', '/about', '/contact', '/affiliate-disclosure', '/privacy-policy', '/terms-of-service']
   const urls: { loc: string; lastmod?: string; priority: string }[] = []
   for (const s of staticUrls) urls.push({ loc: SITE.url + s, priority: s === '' ? '1.0' : '0.7' })
   for (const cat of categories) urls.push({ loc: `${SITE.url}/category/${cat.slug}`, priority: '0.8' })
+  for (const h of hubs) urls.push({ loc: `${SITE.url}/best/${h.slug}`, lastmod: h.updated_at, priority: '0.9' })
   for (const d of deals) urls.push({ loc: `${SITE.url}/reviews/${d.slug}`, lastmod: d.updated_at, priority: '0.8' })
   for (const p of posts) urls.push({ loc: `${SITE.url}/blog/${p.slug}`, lastmod: p.updated_at, priority: p.pillar ? '0.9' : '0.6' })
 

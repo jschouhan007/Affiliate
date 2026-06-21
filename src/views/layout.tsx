@@ -32,6 +32,9 @@ export function Layout(opts: LayoutOpts) {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+  </script>
   <title>${fullTitle}</title>
   <meta name="description" content="${description}" />
   <link rel="canonical" href="${canonUrl}" />
@@ -87,9 +90,18 @@ export function Layout(opts: LayoutOpts) {
   <main class="flex-1">${raw(children)}</main>
   ${raw(Footer(categories))}
   ${raw(CookieBanner())}
+  ${raw(CompareTray())}
   <script src="/static/app.js" defer></script>
 </body>
 </html>`
+}
+
+function ThemeToggle(): string {
+  return `<button id="theme-toggle" class="theme-toggle" role="switch" aria-label="Toggle dark mode" title="Toggle theme">
+    <i class="ico-sun fas fa-sun"></i>
+    <i class="ico-moon fas fa-moon"></i>
+    <span class="knob"><i class="fas fa-fire-flame-curved"></i></span>
+  </button>`
 }
 
 function TopBar(): string {
@@ -128,6 +140,7 @@ function Header(categories: Category[]): string {
               <div class="bg-surface shadow-[0_24px_60px_-30px_rgba(28,25,23,0.4)] rounded border border-line p-2 min-w-[230px]">${catLinks}</div>
             </div>
           </div>
+          <a href="/best" class="link-underline hover:text-ink">Best Of</a>
           <a href="/guides" class="link-underline hover:text-ink">Buying Guides</a>
           <a href="/blog" class="link-underline hover:text-ink">Journal</a>
           <a href="/about" class="link-underline hover:text-ink">About</a>
@@ -137,12 +150,14 @@ function Header(categories: Category[]): string {
             <i class="fas fa-search text-ink-faint text-xs"></i>
             <input type="text" name="q" placeholder="Search" class="bg-transparent outline-none text-sm px-2 w-24 lg:w-36 placeholder:text-ink-faint" />
           </form>
+          ${ThemeToggle()}
           <button id="mobile-menu-btn" class="md:hidden p-2 text-ink" aria-label="Menu"><i class="fas fa-bars text-lg"></i></button>
         </div>
       </div>
     </div>
     <div id="mobile-menu" class="hidden md:hidden border-t border-line bg-surface px-5 py-4 space-y-1">
       <a href="/deals" class="block px-2 py-2 text-ink-soft hover:text-accent">Deals</a>
+      <a href="/best" class="block px-2 py-2 text-ink-soft hover:text-accent">Best Of</a>
       <a href="/guides" class="block px-2 py-2 text-ink-soft hover:text-accent">Buying Guides</a>
       <a href="/blog" class="block px-2 py-2 text-ink-soft hover:text-accent">Journal</a>
       <a href="/about" class="block px-2 py-2 text-ink-soft hover:text-accent">About</a>
@@ -202,6 +217,16 @@ function Footer(categories: Category[]): string {
       </div>
     </div>
   </footer>`
+}
+
+function CompareTray(): string {
+  return `
+  <div id="compare-tray" class="compare-tray" role="region" aria-label="Comparison tray">
+    <span class="eyebrow eyebrow-mute whitespace-nowrap hidden sm:inline">Compare</span>
+    <div id="compare-thumbs" class="flex items-center gap-2"></div>
+    <a id="compare-go" href="/compare" class="btn btn-primary btn-sm whitespace-nowrap">Compare <span id="compare-count">0</span> <i class="fas fa-arrow-right text-[0.7rem]"></i></a>
+    <button type="button" id="compare-tray-clear" class="text-ink-faint hover:text-ink text-sm px-1" title="Clear">&times;</button>
+  </div>`
 }
 
 function CookieBanner(): string {

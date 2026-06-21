@@ -94,7 +94,43 @@ export function productSchema(deal: Deal): string {
       worstRating: 1,
     }
   }
+  // Emit an editorial Review so Google can show star ratings in the SERP.
+  if (deal.rating) {
+    const reviewBody =
+      deal.verdict || deal.short_desc || `Our hands-on assessment of the ${deal.title}.`
+    obj.review = {
+      '@type': 'Review',
+      reviewRating: {
+        '@type': 'Rating',
+        ratingValue: deal.rating,
+        bestRating: 5,
+        worstRating: 1,
+      },
+      author: { '@type': 'Organization', name: deal.tested_by || SITE.name },
+      publisher: { '@type': 'Organization', name: SITE.name },
+      reviewBody,
+      datePublished: (deal.updated_at || deal.created_at || '').slice(0, 10) || undefined,
+    }
+  }
   return json(obj)
+}
+
+// Hub collection page — surfaces as an ItemList of the spoke products.
+export function hubSchema(hub: { title: string; dek?: string; slug: string }, deals: Deal[]): string {
+  return json({
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: hub.title,
+    description: hub.dek,
+    url: `${SITE.url}/best/${hub.slug}`,
+    numberOfItems: deals.length,
+    itemListElement: deals.map((d, idx) => ({
+      '@type': 'ListItem',
+      position: idx + 1,
+      url: `${SITE.url}/reviews/${d.slug}`,
+      name: d.title,
+    })),
+  })
 }
 
 export function faqSchema(faqs: Faq[]): string {

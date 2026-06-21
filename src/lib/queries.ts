@@ -1,4 +1,4 @@
-import type { Category, Deal, Post, Offer, Faq } from '../types'
+import type { Category, Deal, Post, Offer, Faq, Hub } from '../types'
 
 export async function getCategories(db: D1Database): Promise<Category[]> {
   const { results } = await db
@@ -172,6 +172,72 @@ export async function searchAll(
     .bind(like, like)
     .all<Post>()
   return { deals: deals || [], posts: posts || [] }
+}
+
+// ---- Hubs (hub-and-spoke) ----
+export async function getHubs(db: D1Database): Promise<Hub[]> {
+  const { results } = await db
+    .prepare('SELECT * FROM hubs WHERE published = 1 ORDER BY updated_at DESC')
+    .all<Hub>()
+  return results || []
+}
+
+export async function getHubBySlug(db: D1Database, slug: string): Promise<Hub | null> {
+  return await db.prepare('SELECT * FROM hubs WHERE slug = ? AND published = 1').bind(slug).first<Hub>()
+}
+
+// Resolve a hub's spoke deals programmatically from its rule.
+export async function getHubDeals(db: D1Database, hub: Hub): Promise<Deal[]> {
+  let deals: Deal[] = []
+  if (hub.rule_type === 'manual') {
+    const { results } = await db
+      .prepare(
+        `SELECT d.*, c.slug AS category_slug, c.name AS category_name, hd.note, hd.sort_order
+         FROM hub_deals hd JOIN deals d ON d.id = hd.deal_id
+         LEFT JOIN categories c ON c.id = d.category_id
+         WHERE hd.hub_id = ? AND d.published = 1
+         ORDER BY hd.sort_order`
+      )
+      .bind(hub.id)
+      .all<Deal>()
+    deals = results || []
+  } else if (hub.rule_type === 'category' && hub.rule_value) {
+    const cat = await getCategoryBySlug(db, hub.rule_value)
+    if (cat) deals = await getDeals(db, { categoryId: cat.id, limit: 24 })
+  } else if (hub.rule_type === 'feature' && hub.rule_value) {
+    const { results } = await db
+      .prepare(
+        DEAL_SELECT + " WHERE d.published = 1 AND d.features LIKE ? ORDER BY d.featured DESC, d.rating DESC LIMIT 24"
+      )
+      .bind(`%${hub.rule_value}%`)
+      .all<Deal>()
+    deals = results || []
+  } else if (hub.rule_type === 'price' && hub.rule_value) {
+    // deals whose cheapest offer is <= rule_value
+    const max = Number(hub.rule_value)
+    const all = await getDeals(db, { limit: 200 })
+    deals = all.filter((d) => {
+      const cheapest = (d.offers || []).filter((o) => o.price != null).sort((a, b) => (a.price as number) - (b.price as number))[0]
+      return cheapest && (cheapest.price as number) <= max
+    })
+  }
+  for (const d of deals) if (!d.offers) d.offers = await getOffersForDeal(db, d.id)
+  return deals
+}
+
+export async function getDealsByIds(db: D1Database, ids: number[]): Promise<Deal[]> {
+  if (!ids.length) return []
+  const safe = ids.filter((n) => Number.isInteger(n)).slice(0, 4)
+  if (!safe.length) return []
+  const placeholders = safe.map(() => '?').join(',')
+  const { results } = await db
+    .prepare(DEAL_SELECT + ` WHERE d.published = 1 AND d.id IN (${placeholders})`)
+    .bind(...safe)
+    .all<Deal>()
+  const deals = results || []
+  for (const d of deals) d.offers = await getOffersForDeal(db, d.id)
+  // preserve requested order
+  return safe.map((id) => deals.find((d) => d.id === id)).filter(Boolean) as Deal[]
 }
 
 export async function getRelatedDeals(

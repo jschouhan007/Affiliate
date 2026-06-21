@@ -221,3 +221,142 @@ UPDATE posts SET author='Rohan Desai', author_role='Consumer Editor', read_minut
 UPDATE posts SET author='Sunita Rao', author_role='Home & Kitchen Editor', read_minutes=7,
   dek='From everyday dal to heavy masala prep, the mixer grinders that actually earn their place on your counter.'
   WHERE slug='best-mixer-grinder-india';
+
+-- ============================================================
+-- Filterable features + spec summaries (for faceted search & matrix)
+-- ============================================================
+UPDATE deals SET features='5G,Fast Charging,Big Battery,90Hz Display', spec_summary='6.74" 90Hz · Dimensity 6100+ · 5000mAh' WHERE slug='redmi-13c-5g';
+UPDATE deals SET features='Wireless,Sweat Resistant,Gaming Mode,Long Battery', spec_summary='42h battery · IPX4 · BEAST low-latency mode' WHERE slug='boat-airdopes-141';
+UPDATE deals SET features='Bluetooth Calling,AMOLED,Long Battery,Fitness', spec_summary='1.85" AMOLED · BT calling · 7-day battery' WHERE slug='noise-colorfit-pro-5';
+UPDATE deals SET features='High Power,Warranty,Durable', spec_summary='750W · 3 SS jars · 2-yr warranty' WHERE slug='prestige-iris-mixer';
+UPDATE deals SET features='Lightweight,Durable,Water Resistant', spec_summary='20L · padded back · daily-use fabric' WHERE slug='decathlon-quechua-backpack';
+UPDATE deals SET features='Wireless,Noise Cancelling,Hi-Res,Fast Charging', spec_summary='50dB ANC · LDAC Hi-Res · fast charge' WHERE slug='realme-buds-air-6';
+UPDATE deals SET features='5G,Fast Charging,AMOLED,120Hz Display', spec_summary='120Hz AMOLED · SD 7 Gen 3 · 100W charging' WHERE slug='oneplus-nord-ce4';
+UPDATE deals SET features='Multi-Cooker,Programmable,Durable', spec_summary='6L · 7-in-1 · stainless inner pot' WHERE slug='instant-pot-duo';
+UPDATE deals SET features='Anti-Slip,Lightweight,Easy Clean', spec_summary='6mm · anti-slip · carry strap' WHERE slug='boldfit-yoga-mat';
+UPDATE deals SET features='4K,HDR,Voice Remote,Streaming', spec_summary='4K HDR · Dolby Vision · Alexa remote' WHERE slug='fire-tv-stick-4k';
+
+-- ============================================================
+-- Hub-and-spoke pages
+-- ============================================================
+INSERT INTO hubs (slug, title, dek, intro, rule_type, rule_value) VALUES
+  ('best-tech-for-students',
+   'Best Tech & Gadgets for Students',
+   'A complete, tested kit for studying smarter — without blowing the semester budget.',
+   'We assembled a student starter kit from products we''ve actually tested. Each pick balances **price, durability and genuine usefulness** for campus life — from a dependable 5G phone to earbuds that survive the library and the gym. Every item links to a full review and the current best price.',
+   'manual', NULL),
+  ('best-under-5000',
+   'Best Deals Under ₹5,000',
+   'Proof that a tight budget still buys genuinely good products.',
+   'Everything here costs **under ₹5,000** and earned a recommendation on merit, not just price. This hub updates automatically as prices change.',
+   'price', '5000'),
+  ('best-wireless-audio',
+   'Best Wireless Audio',
+   'Cut the cord without cutting corners — our tested wireless picks.',
+   'Our favourite **wireless** audio gear, pulled together automatically from across our reviews.',
+   'feature', 'Wireless');
+
+-- Manual spokes for the students hub
+INSERT INTO hub_deals (hub_id, deal_id, sort_order, note) VALUES
+  ((SELECT id FROM hubs WHERE slug='best-tech-for-students'), (SELECT id FROM deals WHERE slug='redmi-13c-5g'), 1, 'A reliable 5G phone that lasts the day between lectures.'),
+  ((SELECT id FROM hubs WHERE slug='best-tech-for-students'), (SELECT id FROM deals WHERE slug='boat-airdopes-141'), 2, 'Library-friendly earbuds with battery that survives finals week.'),
+  ((SELECT id FROM hubs WHERE slug='best-tech-for-students'), (SELECT id FROM deals WHERE slug='noise-colorfit-pro-5'), 3, 'Keeps you on schedule and nudges you to move between study sessions.'),
+  ((SELECT id FROM hubs WHERE slug='best-tech-for-students'), (SELECT id FROM deals WHERE slug='fire-tv-stick-4k'), 4, 'Turns a cheap hostel TV into a proper streaming setup for downtime.');
+
+-- ============================================================
+-- Blog enrichment: bylines, deks, read times on existing posts
+-- ============================================================
+UPDATE posts SET author='Aarav Mehta', author_role='Senior Audio Reviewer', read_minutes=7,
+  dek='We bought and lived with the most popular budget TWS earbuds for weeks. Only two earned a spot on this list.'
+  WHERE slug='best-budget-earbuds-under-2000';
+UPDATE posts SET author='Priya Nair', author_role='Mobile & Telecom Editor', read_minutes=9,
+  dek='5G under ₹15,000 is no longer a compromise. Here is exactly which phone to buy, and why.'
+  WHERE slug='best-5g-phones-under-15000';
+UPDATE posts SET author='Rohan Verma', author_role='Consumer Rights Writer', read_minutes=5,
+  dek='That bright red "60% OFF" tag is often hiding a price that was never real. Here is the 60-second check that protects you.'
+  WHERE slug='how-to-spot-a-fake-discount';
+UPDATE posts SET author='Sneha Iyer', author_role='Kitchen & Appliances Lead', read_minutes=8,
+  dek='From everyday dal to the toughest dry masala, here are the mixer grinders our test kitchen actually keeps using.'
+  WHERE slug='best-mixer-grinder-india';
+
+-- ============================================================
+-- New product-focused blog content
+-- ============================================================
+INSERT INTO posts (slug, title, excerpt, body, cover_image, category_id, author, author_role, read_minutes, dek, post_type, pillar, published_at, updated_at) VALUES
+  ('boat-airdopes-141-long-term-review',
+   'boAt Airdopes 141, Six Months Later: Still the Budget King?',
+   'We have used the boAt Airdopes 141 every single day for six months. Here is how they actually hold up beyond the honeymoon period.',
+   '## The short answer\nAfter six months of daily abuse — gym, commute, calls, gaming — the **boAt Airdopes 141** remain the budget earbuds we recommend first. Battery degradation has been minimal, and the low-latency mode is still the best thing about them at this price.\n\n## What six months of real use looks like\nMost reviews judge earbuds in the first week, when everything is shiny. The interesting question is what happens after the case has been dropped a dozen times and the buds have lived in a sweaty gym bag.\n\nThe short version: they survived. The matte finish on our pair shows light scuffing, but the hinge is still tight, and the magnets still snap the buds into place satisfyingly.\n\n## Battery: the honest numbers\nWhen new, we measured close to **5 hours 40 minutes** per charge at 60% volume. Six months on, that is down to roughly **5 hours 10 minutes** — a normal, gentle decline, not the cliff-edge drop cheap batteries sometimes suffer.\n\n## Where they still shine\n- **Low-latency BEAST mode** keeps audio locked to video while gaming.\n- **IPX4 sweat resistance** has shrugged off every workout.\n- **Fast charging** genuinely delivers about 90 minutes of playback from a 5-minute top-up.\n\n## Where they fall short\n- **Call quality** in wind is still mediocre.\n- **No app** for EQ tuning — the sound is what it is.\n- The case **lacks wireless charging**, though that is expected here.\n\n## Should you buy them in 2026?\nYes — if your budget is firm at around ₹1,500, nothing we have tested beats them on the fundamentals. If you can stretch, read our earbuds roundup for a noise-cancelling alternative.\n\n## The verdict\nSix months in, the Airdopes 141 have earned their reputation. They are not exciting, but they are dependable — and at this price, dependable is exactly what you want.',
+   'https://m.media-amazon.com/images/I/61u1VALn6JL._SL1500_.jpg',
+   2, 'Aarav Mehta', 'Senior Audio Reviewer', 6,
+   'Most reviews judge earbuds in week one. We judged these in month six — after the drops, the sweat, and the battery cycles.',
+   'review', 0, '2026-06-08 10:00:00', '2026-06-15 10:00:00'),
+
+  ('redmi-13c-5g-vs-oneplus-nord-ce4',
+   'Redmi 13C 5G vs OnePlus Nord CE4: Which Budget 5G Phone Wins?',
+   'One costs half as much as the other. We put the Redmi 13C 5G head-to-head with the OnePlus Nord CE4 to see where your money actually goes.',
+   '## The short answer\nBuy the **Redmi 13C 5G** if your budget is tight and you mainly browse, message and watch video. Buy the **OnePlus Nord CE4** if you game, shoot a lot of photos, or simply want a phone that feels fast for the next three years.\n\n## Price and what it buys you\nThe gap between these two is significant, and it shows up exactly where you would expect: chipset, charging, and camera. The question is whether those upgrades matter for *your* use.\n\n## Performance\nThe Nord CE4 is in a different class here. Day-to-day, the Redmi 13C 5G is perfectly smooth for light use, but open a demanding game and the difference is obvious — sustained frame rates, faster app loads, and far less thermal throttling on the OnePlus.\n\n## Display\nBoth get you a large, fluid screen, but the Nord CE4 pushes higher brightness and a smoother panel that is noticeably nicer outdoors.\n\n## Battery and charging\nBoth last a full day. The headline difference is charging speed — the Nord CE4 refuels dramatically faster, which genuinely changes how you live with the phone.\n\n## Cameras\nIn good light, both are fine. Push into low light or fast-moving subjects and the Nord CE4 pulls clearly ahead.\n\n## Who should buy which?\n- **Choose the Redmi 13C 5G** for a dependable, no-drama budget 5G phone.\n- **Choose the OnePlus Nord CE4** if performance, charging and camera quality justify the extra spend.\n\n## The verdict\nThis is not really a fight — it is a budget decision. Both are good at their price. Match the phone to how you actually use it, not to the spec sheet.',
+   'https://m.media-amazon.com/images/I/81X5cKQ8mGL._SL1500_.jpg',
+   1, 'Priya Nair', 'Mobile & Telecom Editor', 8,
+   'One costs roughly double the other. We spent two weeks with both to find out whether the extra money is real value or just marketing.',
+   'comparison', 0, '2026-06-09 09:00:00', '2026-06-14 09:00:00'),
+
+  ('fire-tv-stick-4k-setup-guide',
+   'Fire TV Stick 4K: The Setup Guide That Gets It Right',
+   'Unboxing a Fire TV Stick 4K is easy. Setting it up so it is actually fast, private and clutter-free takes a few extra steps. Here they are.',
+   '## The short answer\nThe **Fire TV Stick 4K** is the easiest way to turn any HDMI TV into a proper 4K streaming machine. Spend ten minutes on the settings below and it will feel twice as good as the out-of-the-box experience.\n\n## Before you plug in\nUse the included HDMI extender if your ports are cramped — it improves Wi-Fi reception and stops the stick from blocking adjacent ports.\n\n## First-boot essentials\n1. **Connect to 5GHz Wi-Fi** if your router supports it — it makes 4K streaming far more stable.\n2. **Sign in** and let it update fully before you start installing apps.\n3. **Pair the remote** and run the audio/video setup so HDR and Dolby are enabled.\n\n## Make it fast\n- Turn off **app auto-launch / featured video** so the home screen stops auto-playing trailers.\n- Clear unused apps to keep the limited storage breathing.\n- Enable **Display mirroring** only when you need it.\n\n## Make it private\n- Disable **data monitoring** and interest-based ads in Settings → Preferences → Privacy.\n- Turn off **collect app usage data** if you would rather not share it.\n\n## Get the most from the remote\nThe voice button is genuinely useful — searching across apps by voice is faster than typing. Map the app shortcut buttons to services you actually use.\n\n## The verdict\nThe Fire TV Stick 4K is excellent value, but the default settings prioritise Amazon, not you. Ten minutes of tuning turns a good streamer into a great one.',
+   'https://m.media-amazon.com/images/I/51TjJOTfslL._SL1000_.jpg',
+   2, 'Kabir Shah', 'Smart Home & Streaming', 5,
+   'Plugging it in is the easy part. These settings are what separate a cluttered, ad-heavy box from a fast, private streaming setup.',
+   'guide', 0, '2026-06-10 12:00:00', '2026-06-10 12:00:00'),
+
+  ('best-yoga-mat-buying-guide',
+   'How to Choose a Yoga Mat That Actually Lasts',
+   'Thickness, grip, material, length — buying a yoga mat is more confusing than it should be. This guide cuts through it in five minutes.',
+   '## The short answer\nFor most people, a **6mm TPE mat** with a textured, non-slip surface is the right balance of cushioning and stability — and the **Boldfit yoga mat** is the one we recommend for value.\n\n## Thickness: the trade-off\n- **4mm**: Stable for standing poses, but hard on the knees.\n- **6mm**: The sweet spot — joint comfort without feeling like a trampoline.\n- **8mm+**: Plush, but wobbly for balance work; better for floor and restorative practice.\n\n## Material matters\n- **TPE**: Light, recyclable, good grip — our default recommendation.\n- **PVC**: Durable and grippy but less eco-friendly.\n- **Natural rubber**: Best grip, heavier, pricier, and not vegan if latex bothers you.\n\n## Grip and texture\nA mat that slips is dangerous and frustrating. Look for a textured surface that grips even when your palms sweat. If you do hot yoga, prioritise grip above everything.\n\n## Size and weight\nIf you are tall, check the length — many budget mats are shorter than you expect. If you carry it to class, weight matters more than you think.\n\n## How to make it last\n- Wipe it down after sweaty sessions.\n- Roll it with the top surface facing out to stop the edges curling.\n- Keep it out of direct sun, which degrades the foam.\n\n## The verdict\nDo not overthink it. A 6mm TPE mat with genuine grip covers 90% of people. Spend the saved money on classes, not marketing gimmicks.',
+   'https://images.unsplash.com/photo-1601925260368-ae2f83cf8b7f?w=1200&q=80',
+   5, 'Sneha Iyer', 'Fitness & Wellbeing', 5,
+   'Thickness, grip, material, length — the choices are confusing on purpose. Here is the simple framework that gets you the right mat.',
+   'guide', 1, '2026-06-11 08:00:00', '2026-06-11 08:00:00'),
+
+  ('instant-pot-duo-first-week',
+   'Instant Pot Duo: What Nobody Tells You in the First Week',
+   'An Instant Pot can transform weeknight cooking — but only once you get past the intimidating first few uses. Here is what we wish we knew sooner.',
+   '## The short answer\nThe **Instant Pot Duo** earns its counter space, but the first week is where most people give up. Get through these early hurdles and it becomes the appliance you reach for daily.\n\n## The water test (do it first)\nBefore cooking anything, run a plain **water test** to learn how pressurising and venting feels and sounds. It removes the fear factor instantly.\n\n## Understand "time to pressure"\nThe cook timer does not start until the pot reaches pressure. A "10-minute" recipe can take 25 minutes door-to-door. Once you expect this, the planning gets easy.\n\n## Natural release vs quick release\n- **Quick release**: Fast, dramatic steam — great for vegetables.\n- **Natural release**: Gentler, better for rice, dal and meat. Skipping it is the #1 cause of disappointing results.\n\n## The recipes that build confidence\nStart with **dal, rice, and boiled eggs**. They are forgiving, fast, and show off what the pot does best. Save the elaborate curries for week two.\n\n## Cleaning and care\n- The sealing ring absorbs smells — keep a spare and swap for sweet vs savoury cooking.\n- The inner pot is dishwasher-safe; the base is not — never immerse it.\n\n## The verdict\nThe Instant Pot Duo is not magic, it is a tool — and like any tool, the first week is about learning it. Push through, and it pays you back every single weeknight.',
+   'https://m.media-amazon.com/images/I/71V1LrY1MSL._SL1500_.jpg',
+   4, 'Sneha Iyer', 'Kitchen & Appliances Lead', 6,
+   'The first week with a pressure cooker is where most people quit. These are the things we wish someone had told us on day one.',
+   'review', 0, '2026-06-12 08:00:00', '2026-06-12 08:00:00'),
+
+  ('smartwatch-vs-fitness-band',
+   'Smartwatch or Fitness Band? How to Choose Without Overspending',
+   'They track the same steps, but they are built for very different people. Here is how to decide before you spend a rupee.',
+   '## The short answer\nBuy a **fitness band** if you mainly want activity and sleep tracking with multi-day battery. Buy a **smartwatch** like the Noise ColorFit Pro 5 if you want notifications, a big bright screen, and a more phone-like experience on your wrist.\n\n## What a band does best\n- **Battery life** measured in days, sometimes weeks.\n- **Lightweight** and unobtrusive for sleep tracking.\n- **Lower price** for the core health metrics.\n\n## What a smartwatch adds\n- A larger, brighter display you can actually read notifications on.\n- App-like features: music control, quick replies, mini widgets.\n- A more "device" feel — at the cost of charging more often.\n\n## Be honest about battery\nThis is the real dividing line. A smartwatch screen that big needs charging every few days. If charging another gadget annoys you, a band is the smarter pick.\n\n## Accuracy reality check\nFor steps, sleep and heart-rate *trends*, both are good enough. Neither is medical-grade — treat the numbers as guidance, not gospel.\n\n## Who should buy which?\n- **Band**: minimalists, runners, anyone who hates charging.\n- **Smartwatch**: notification junkies who want a glanceable screen.\n\n## The verdict\nThere is no universally better choice — only the better choice for your habits. Decide how much you care about screen size versus battery life, and the rest follows.',
+   'https://m.media-amazon.com/images/I/61ZjlBOp+rL._SL1500_.jpg',
+   2, 'Kabir Shah', 'Smart Home & Wearables', 6,
+   'They track the same steps but suit very different people. The deciding factor is simpler than the spec sheets suggest.',
+   'comparison', 1, '2026-06-13 09:00:00', '2026-06-13 09:00:00');
+
+-- Link new pillar/comparison posts to relevant deals
+INSERT INTO post_deals (post_id, deal_id, sort_order) VALUES
+  ((SELECT id FROM posts WHERE slug='boat-airdopes-141-long-term-review'), (SELECT id FROM deals WHERE slug='boat-airdopes-141'), 1),
+  ((SELECT id FROM posts WHERE slug='boat-airdopes-141-long-term-review'), (SELECT id FROM deals WHERE slug='realme-buds-air-6'), 2),
+  ((SELECT id FROM posts WHERE slug='redmi-13c-5g-vs-oneplus-nord-ce4'), (SELECT id FROM deals WHERE slug='redmi-13c-5g'), 1),
+  ((SELECT id FROM posts WHERE slug='redmi-13c-5g-vs-oneplus-nord-ce4'), (SELECT id FROM deals WHERE slug='oneplus-nord-ce4'), 2),
+  ((SELECT id FROM posts WHERE slug='fire-tv-stick-4k-setup-guide'), (SELECT id FROM deals WHERE slug='fire-tv-stick-4k'), 1),
+  ((SELECT id FROM posts WHERE slug='best-yoga-mat-buying-guide'), (SELECT id FROM deals WHERE slug='boldfit-yoga-mat'), 1),
+  ((SELECT id FROM posts WHERE slug='instant-pot-duo-first-week'), (SELECT id FROM deals WHERE slug='instant-pot-duo'), 1),
+  ((SELECT id FROM posts WHERE slug='smartwatch-vs-fitness-band'), (SELECT id FROM deals WHERE slug='noise-colorfit-pro-5'), 1),
+  ((SELECT id FROM posts WHERE slug='smartwatch-vs-fitness-band'), (SELECT id FROM deals WHERE slug='boat-airdopes-141'), 2);
+
+-- FAQs for new blogs (also feed FAQ structured data on listicles)
+INSERT INTO faqs (parent_type, parent_id, question, answer, sort_order) VALUES
+  ('post', (SELECT id FROM posts WHERE slug='boat-airdopes-141-long-term-review'), 'Do the boAt Airdopes 141 lose battery life over time?', 'Yes, but gently. After six months of daily use our pair dropped from about 5 hours 40 minutes to roughly 5 hours 10 minutes per charge — a normal, gradual decline rather than a sudden failure.', 1),
+  ('post', (SELECT id FROM posts WHERE slug='boat-airdopes-141-long-term-review'), 'Are they good for the gym?', 'Yes. The IPX4 rating has handled months of sweaty workouts without issue, and the secure fit stays put during movement.', 2),
+  ('post', (SELECT id FROM posts WHERE slug='redmi-13c-5g-vs-oneplus-nord-ce4'), 'Is the OnePlus Nord CE4 worth the extra money over the Redmi 13C 5G?', 'It is if you game, shoot a lot of photos, or want a phone that stays fast for years. For light browsing and messaging, the Redmi 13C 5G is the smarter value buy.', 1),
+  ('post', (SELECT id FROM posts WHERE slug='redmi-13c-5g-vs-oneplus-nord-ce4'), 'Which one has better battery life?', 'Both comfortably last a full day. The OnePlus Nord CE4 wins decisively on charging speed, refuelling far faster than the Redmi.', 2),
+  ('post', (SELECT id FROM posts WHERE slug='fire-tv-stick-4k-setup-guide'), 'How do I stop the Fire TV Stick from auto-playing trailers?', 'Go to Settings → Preferences → Featured Content and turn off both video and audio autoplay. The home screen becomes calm and instant.', 1),
+  ('post', (SELECT id FROM posts WHERE slug='best-yoga-mat-buying-guide'), 'What thickness of yoga mat is best?', 'For most people a 6mm mat is ideal — enough cushioning to protect knees and joints while staying stable for balance poses.', 1),
+  ('post', (SELECT id FROM posts WHERE slug='best-yoga-mat-buying-guide'), 'Is TPE or PVC better for a yoga mat?', 'TPE is lighter, more eco-friendly and offers great grip, which is why we recommend it for most buyers. PVC is slightly more durable but less environmentally friendly.', 2),
+  ('post', (SELECT id FROM posts WHERE slug='instant-pot-duo-first-week'), 'Why does my Instant Pot take longer than the recipe says?', 'The cooking timer only starts once the pot reaches pressure, which can take 10–15 minutes. Always add this "time to pressure" to the stated cook time when planning.', 1),
+  ('post', (SELECT id FROM posts WHERE slug='smartwatch-vs-fitness-band'), 'Is a smartwatch or fitness band better for sleep tracking?', 'A fitness band is usually better for sleep because it is lighter, more comfortable overnight, and lasts several days between charges so it is rarely off your wrist.', 1);

@@ -51,6 +51,8 @@ export interface Deal {
   tested_by?: string
   verdict?: string
   award?: string
+  features?: string
+  spec_summary?: string
   featured: number
   published: number
   created_at: string
@@ -77,6 +79,21 @@ export interface Post {
   published: number
   published_at: string
   updated_at: string
+}
+
+export interface Hub {
+  id: number
+  slug: string
+  title: string
+  dek?: string
+  intro?: string
+  cover_image?: string
+  rule_type: string
+  rule_value?: string
+  published: number
+  updated_at: string
+  created_at: string
+  deals?: Deal[]
 }
 
 export interface Faq {

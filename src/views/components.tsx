@@ -115,23 +115,44 @@ export function PriceBox(deal: Deal, sourcePath: string): string {
 }
 
 // ---- Editor's Pick card (dual CTAs, zoom image, lift + glow) ----
-export function DealCard(deal: Deal, opts: { rank?: number; sourcePath?: string } = {}): string {
+// opts.compare → render add-to-compare checkbox + filterable data-* attrs
+export function DealCard(
+  deal: Deal,
+  opts: { rank?: number; sourcePath?: string; compare?: boolean } = {}
+): string {
   const cheapest = (deal.offers || [])
     .filter((o) => o.price != null)
     .sort((a, b) => (a.price as number) - (b.price as number))[0]
   const disc = cheapest ? discountPct(cheapest.price, cheapest.original_price) : null
   const award = deal.award || (deal.featured ? "Editor's Pick" : '')
   const source = opts.sourcePath || `/reviews/${deal.slug}`
+  const price = cheapest?.price ?? ''
+  const features = deal.features || ''
 
-  return `<article class="card group flex flex-col h-full">
-    <a href="/reviews/${deal.slug}" class="card-img block relative aspect-[5/4] bg-panel">
-      ${deal.image_url
-        ? `<img src="${deal.image_url}" alt="${deal.title}" loading="lazy" class="w-full h-full object-contain p-6" />`
-        : `<div class="w-full h-full flex items-center justify-center text-ink-faint"><i class="fas fa-box-open text-4xl"></i></div>`}
+  // Strict image dimensions kill layout shift (CLS). 5:4 box → 500x400.
+  const img = deal.image_url
+    ? `<img src="${deal.image_url}" alt="${deal.title}" loading="lazy" decoding="async" width="500" height="400" class="w-full h-full object-contain p-6" />`
+    : `<div class="w-full h-full flex items-center justify-center text-ink-faint"><i class="fas fa-box-open text-4xl"></i></div>`
+
+  const compareBtn = opts.compare
+    ? `<button type="button" class="compare-check" data-compare="${deal.id}" aria-pressed="false" title="Add to comparison"><i class="fas fa-plus text-[0.62rem]"></i> Compare</button>`
+    : ''
+
+  return `<article class="card group flex flex-col h-full deal-card"
+      data-id="${deal.id}"
+      data-title="${escapeAttr(deal.title)}"
+      data-brand="${escapeAttr(deal.brand || '')}"
+      data-price="${price}"
+      data-rating="${deal.rating ?? 0}"
+      data-features="${escapeAttr(features)}"
+      data-category="${escapeAttr(deal.category_slug || '')}">
+    <div class="card-img block relative aspect-[5/4] bg-panel">
+      <a href="/reviews/${deal.slug}" class="block w-full h-full">${img}</a>
       ${disc ? `<span class="absolute bottom-4 left-4 pill pill-accent shadow-sm">−${disc}%</span>` : ''}
       ${opts.rank ? `<span class="absolute top-4 left-4 font-serif text-lg text-ink bg-surface/90 backdrop-blur w-9 h-9 flex items-center justify-center rounded-full border border-line">${opts.rank}</span>` : ''}
       ${award ? `<span class="absolute top-4 right-4 pill pill-ink">${award}</span>` : ''}
-    </a>
+      ${compareBtn}
+    </div>
     <div class="p-5 flex flex-col flex-1">
       ${deal.category_name ? `<a href="/category/${deal.category_slug}" class="eyebrow text-[0.66rem] mb-2 block">${deal.category_name}</a>` : ''}
       <h3 class="font-serif text-lg leading-snug text-ink mb-2 line-clamp-2"><a href="/reviews/${deal.slug}" class="hover:text-accent transition">${deal.title}</a></h3>
@@ -149,11 +170,15 @@ export function DealCard(deal: Deal, opts: { rank?: number; sourcePath?: string 
   </article>`
 }
 
-export function DealGrid(deals: Deal[], ranked = false, sourcePath?: string): string {
+function escapeAttr(s: string): string {
+  return String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string))
+}
+
+export function DealGrid(deals: Deal[], ranked = false, sourcePath?: string, compare = false): string {
   if (!deals.length)
     return `<div class="text-center py-20 text-ink-faint"><i class="fas fa-box-open text-3xl mb-3"></i><p>Nothing here yet — check back soon.</p></div>`
   return `<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">${deals
-    .map((d, i) => DealCard(d, { rank: ranked ? i + 1 : undefined, sourcePath }))
+    .map((d, i) => DealCard(d, { rank: ranked ? i + 1 : undefined, sourcePath, compare }))
     .join('')}</div>`
 }
 
@@ -276,5 +301,160 @@ export function SectionHeader(title: string, eyebrow?: string, link?: { text: st
 export function AffiliateNotice(): string {
   return `<div class="flex items-start gap-3 text-sm text-ink-mute border-l-2 border-accent pl-4 py-1 mb-8">
     <span>We independently research everything we recommend. When you buy through links on this page, we may earn a commission — it never affects our verdict. <a href="/affiliate-disclosure" class="text-accent underline underline-offset-2">How this works</a>.</span>
+  </div>`
+}
+
+// ---- Skeleton loaders (perceived performance) ----
+export function SkeletonCard(): string {
+  return `<div class="skel-card flex flex-col h-full" aria-hidden="true">
+    <div class="skeleton aspect-[5/4] !rounded-none"></div>
+    <div class="p-5 space-y-3">
+      <div class="skeleton h-3 w-20"></div>
+      <div class="skeleton h-5 w-full"></div>
+      <div class="skeleton h-4 w-2/3"></div>
+      <div class="skeleton h-9 w-full !rounded-lg mt-4"></div>
+    </div>
+  </div>`
+}
+
+export function SkeletonGrid(n = 6): string {
+  return `<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">${Array.from({ length: n }).map(SkeletonCard).join('')}</div>`
+}
+
+// ---- Faceted filter sidebar (price / rating / brand / features) ----
+// Pure markup; client-side JS in app.js does instant filtering by reading data-* attrs.
+export function FacetSidebar(deals: Deal[]): string {
+  const prices = deals
+    .map((d) => (d.offers || []).filter((o) => o.price != null).map((o) => o.price as number))
+    .flat()
+  const maxPrice = prices.length ? Math.ceil(Math.max(...prices) / 500) * 500 : 100000
+
+  const brands = (Array.from(new Set(deals.map((d) => d.brand).filter(Boolean))) as string[]).sort()
+
+  const featureSet = new Set<string>()
+  deals.forEach((d) =>
+    (d.features || '')
+      .split(',')
+      .map((f) => f.trim())
+      .filter(Boolean)
+      .forEach((f) => featureSet.add(f))
+  )
+  const features = Array.from(featureSet).sort()
+
+  const ratingRows = [4, 3, 2]
+    .map(
+      (r) => `<label class="flex items-center gap-2.5 py-1.5 cursor-pointer text-sm text-ink-soft hover:text-ink">
+        <input type="radio" name="facet-rating" value="${r}" class="!rounded-full" />
+        <span class="stars text-xs">${'<i class="fas fa-star"></i>'.repeat(r)}${'<i class="far fa-star"></i>'.repeat(5 - r)}</span>
+        <span class="text-xs text-ink-faint">${r}.0 &amp; up</span>
+      </label>`
+    )
+    .join('')
+
+  const brandRows = brands
+    .map(
+      (b) => `<label class="flex items-center gap-2.5 py-1.5 cursor-pointer text-sm text-ink-soft hover:text-ink">
+        <input type="checkbox" class="facet-brand" value="${escapeAttr(b)}" /> ${b}
+      </label>`
+    )
+    .join('')
+
+  const featureRows = features
+    .map((f) => `<button type="button" class="chip facet-feature" data-feature="${escapeAttr(f)}">${f}</button>`)
+    .join('')
+
+  return `<aside id="facet-sidebar" class="lg:sticky lg:top-24 self-start" data-max="${maxPrice}">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="font-serif text-xl text-ink flex items-center gap-2"><i class="fas fa-sliders text-accent text-base"></i> Filter</h2>
+      <button type="button" id="facet-reset" class="text-xs text-ink-mute hover:text-accent underline underline-offset-2">Reset</button>
+    </div>
+
+    <div class="border-t border-line py-5">
+      <div class="eyebrow eyebrow-mute mb-3">Price</div>
+      <input type="range" id="facet-price" min="0" max="${maxPrice}" value="${maxPrice}" step="500" class="w-full" />
+      <div class="flex justify-between text-xs text-ink-mute mt-2">
+        <span>₹0</span>
+        <span>Up to <strong id="facet-price-val" class="text-ink">₹${maxPrice.toLocaleString('en-IN')}</strong></span>
+      </div>
+    </div>
+
+    <div class="border-t border-line py-5">
+      <div class="eyebrow eyebrow-mute mb-3">User rating</div>
+      ${ratingRows}
+    </div>
+
+    ${brands.length ? `<div class="border-t border-line py-5">
+      <div class="eyebrow eyebrow-mute mb-3">Brand</div>
+      <div class="max-h-44 overflow-y-auto pr-1">${brandRows}</div>
+    </div>` : ''}
+
+    ${features.length ? `<div class="border-t border-b border-line py-5">
+      <div class="eyebrow eyebrow-mute mb-3">Features</div>
+      <div class="flex flex-wrap gap-2">${featureRows}</div>
+    </div>` : ''}
+  </aside>`
+}
+
+// ---- Interactive comparison matrix (rendered server-side, lazy-revealed client-side) ----
+export function ComparisonMatrix(deals: Deal[], sourcePath: string): string {
+  if (deals.length < 2) return ''
+  const cheapestOf = (d: Deal) =>
+    (d.offers || []).filter((o) => o.price != null).sort((a, b) => (a.price as number) - (b.price as number))[0]
+
+  const priced = deals.map((d) => ({ d, p: cheapestOf(d)?.price ?? Infinity }))
+  const bestId = priced.slice().sort((a, b) => a.p - b.p)[0]?.d.id
+  const bestRatingId = deals.slice().sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0]?.id
+
+  const head = deals
+    .map((d) => {
+      const ch = cheapestOf(d)
+      return `<th class="min-w-[200px]">
+        <a href="/reviews/${d.slug}" class="block group">
+          <div class="w-full h-24 bg-panel rounded mb-3 flex items-center justify-center overflow-hidden">${d.image_url ? `<img src="${d.image_url}" alt="${d.title}" loading="lazy" width="120" height="96" class="h-full object-contain p-2" />` : '<i class="fas fa-box-open text-2xl text-ink-faint"></i>'}</div>
+          <div class="font-serif text-base text-ink leading-snug group-hover:text-accent transition line-clamp-2 text-left">${d.title}</div>
+        </a>
+        ${ch ? `<div class="mt-3 text-left">${CtaButton(ch, sourcePath, 'line')}</div>` : ''}
+      </th>`
+    })
+    .join('')
+
+  const row = (label: string, cells: string[]) =>
+    `<tr><td class="row-label whitespace-nowrap">${label}</td>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`
+
+  const priceRow = row(
+    'Best price',
+    deals.map((d) => {
+      const ch = cheapestOf(d)
+      const isBest = d.id === bestId && ch
+      return ch
+        ? `<span class="font-serif text-lg ${isBest ? 'best' : 'text-ink'}">${formatPrice(ch.price, ch.currency)}</span>${isBest ? ' <span class="pill pill-accent ml-1">Lowest</span>' : ''}`
+        : '—'
+    })
+  )
+  const ratingRow = row(
+    'Our rating',
+    deals.map((d) => {
+      const isBest = d.id === bestRatingId && d.rating
+      return d.rating
+        ? `<div class="${isBest ? 'best' : ''}">${stars(d.rating, 'text-xs')}<div class="text-xs mt-1 ${isBest ? 'best' : 'text-ink-faint'}">${d.rating.toFixed(1)} / 5${isBest ? ' · Top rated' : ''}</div></div>`
+        : '—'
+    })
+  )
+  const brandRow = row('Brand', deals.map((d) => d.brand || '—'))
+  const awardRow = row('Award', deals.map((d) => (d.award ? `<span class="pill pill-accent">${d.award}</span>` : '—')))
+  const specRow = row('Key specs', deals.map((d) => (d.spec_summary ? `<span class="text-sm text-ink-soft">${d.spec_summary}</span>` : '—')))
+  const featRow = row(
+    'Features',
+    deals.map((d) => {
+      const fs = (d.features || '').split(',').map((f) => f.trim()).filter(Boolean)
+      return fs.length ? `<div class="flex flex-wrap gap-1.5">${fs.map((f) => `<span class="pill pill-line !text-[0.6rem]">${f}</span>`).join('')}</div>` : '—'
+    })
+  )
+
+  return `<div class="overflow-x-auto -mx-5 px-5">
+    <table class="matrix w-full text-sm border-collapse">
+      <thead><tr><th class="row-label">&nbsp;</th>${head}</tr></thead>
+      <tbody>${priceRow}${ratingRow}${brandRow}${awardRow}${specRow}${featRow}</tbody>
+    </table>
   </div>`
 }

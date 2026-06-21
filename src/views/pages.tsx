@@ -1,4 +1,4 @@
-import { SITE, type Category, type Deal, type Post } from '../types'
+import { SITE, type Category, type Deal, type Post, type Hub } from '../types'
 import { renderMarkdown } from '../lib/markdown'
 import { formatPrice, discountPct, formatDate, timeAgo } from '../lib/format'
 import {
@@ -9,6 +9,8 @@ import {
   PriceBox,
   ProsCons,
   ComparisonTable,
+  ComparisonMatrix,
+  FacetSidebar,
   FaqSection,
   NewsletterBox,
   SectionHeader,
@@ -27,8 +29,9 @@ export function HomePage(data: {
   latestDeals: Deal[]
   pillars: Post[]
   posts: Post[]
+  hubs?: Hub[]
 }): string {
-  const { categories, featured, latestDeals, pillars, posts } = data
+  const { categories, featured, latestDeals, pillars, posts, hubs = [] } = data
   const lead = featured[0]
   const secondary = featured.slice(1, 4)
   const restFeatured = featured.slice(4, 8)
@@ -59,7 +62,7 @@ export function HomePage(data: {
   <!-- Category ribbon -->
   <div class="border-y border-line bg-panel/60">
     <div class="max-w-editorial mx-auto px-5 py-4 flex items-center gap-4 overflow-x-auto">
-      <span class="eyebrow eyebrow-mute whitespace-nowrap">Browse</span>
+      <a href="/best" class="group flex items-center gap-2.5 whitespace-nowrap text-sm font-semibold text-accent hover:opacity-80 transition py-1"><i class="fas fa-layer-group"></i>Best Of</a>
       <span class="text-line">·</span>
       ${catRow}
     </div>
@@ -105,6 +108,24 @@ export function HomePage(data: {
       </div>
     </section>` : ''}
 
+    ${hubs.length ? `
+    <section class="py-20 border-t border-line">
+      ${SectionHeader('Best-of collections', 'Start your search here', { text: 'All collections', href: '/best' })}
+      <div class="grid md:grid-cols-3 gap-8">
+        ${hubs.slice(0, 3).map((h) => `<a href="/best/${h.slug}" class="card group flex flex-col h-full overflow-hidden">
+          <div class="card-img aspect-[16/10] bg-panel relative">
+            ${h.cover_image ? `<img src="${h.cover_image}" alt="${h.title}" loading="lazy" width="640" height="400" class="w-full h-full object-cover" />` : `<div class="w-full h-full flex items-center justify-center text-ink-faint"><i class="fas fa-layer-group text-4xl"></i></div>`}
+            <span class="absolute top-4 left-4 pill pill-ink">Curated</span>
+          </div>
+          <div class="p-7 flex flex-col flex-1">
+            <h3 class="font-serif text-2xl leading-snug text-ink mb-2 group-hover:text-accent transition">${h.title}</h3>
+            ${h.dek ? `<p class="text-ink-mute leading-relaxed line-clamp-2">${h.dek}</p>` : ''}
+            <span class="mt-auto pt-5 text-sm font-medium text-accent link-underline w-max">Explore the picks <i class="fas fa-arrow-right text-xs"></i></span>
+          </div>
+        </a>`).join('')}
+      </div>
+    </section>` : ''}
+
     ${pillars.length ? `
     <section class="py-20 border-t border-line">
       ${SectionHeader('Buying guides', 'Deep dives', { text: 'All guides', href: '/guides' })}
@@ -132,15 +153,41 @@ export function HomePage(data: {
 // ============================================================
 // DEALS LISTING
 // ============================================================
-export function DealsPage(data: { deals: Deal[]; title: string; subtitle?: string; crumbs: { name: string; url?: string }[] }): string {
-  return `<div class="max-w-editorial mx-auto px-5 py-16">
+export function DealsPage(data: { deals: Deal[]; title: string; subtitle?: string; crumbs: { name: string; url?: string }[]; faceted?: boolean }): string {
+  const { deals, faceted = true } = data
+  if (!faceted) {
+    return `<div class="max-w-editorial mx-auto px-5 py-16">
+      ${Breadcrumbs(data.crumbs)}
+      <header class="max-w-2xl mb-14">
+        <div class="eyebrow mb-4 flex items-center gap-3"><span class="kicker-rule"></span>The collection</div>
+        <h1 class="font-serif text-4xl md:text-5xl text-ink leading-tight">${data.title}</h1>
+        ${data.subtitle ? `<p class="mt-5 text-lg text-ink-soft leading-relaxed">${data.subtitle}</p>` : ''}
+      </header>
+      ${DealGrid(deals, false, undefined, true)}
+    </div>`
+  }
+  return `<div class="max-w-editorial mx-auto px-5 py-16" id="facet-page">
     ${Breadcrumbs(data.crumbs)}
-    <header class="max-w-2xl mb-14">
+    <header class="max-w-2xl mb-12">
       <div class="eyebrow mb-4 flex items-center gap-3"><span class="kicker-rule"></span>The collection</div>
       <h1 class="font-serif text-4xl md:text-5xl text-ink leading-tight">${data.title}</h1>
       ${data.subtitle ? `<p class="mt-5 text-lg text-ink-soft leading-relaxed">${data.subtitle}</p>` : ''}
     </header>
-    ${DealGrid(data.deals)}
+    <div class="grid lg:grid-cols-[260px_1fr] gap-10">
+      ${FacetSidebar(deals)}
+      <div>
+        <div class="flex items-center justify-between mb-6 pb-4 border-b border-line">
+          <p class="text-sm text-ink-mute"><span id="facet-count" class="font-semibold text-ink">${deals.length}</span> product${deals.length === 1 ? '' : 's'}</p>
+          <button type="button" id="facet-toggle-mobile" class="lg:hidden btn btn-line btn-sm"><i class="fas fa-sliders"></i> Filters</button>
+        </div>
+        <div id="facet-results">${DealGrid(deals, false, undefined, true)}</div>
+        <div id="facet-empty" class="is-hidden text-center py-20 text-ink-faint">
+          <i class="fas fa-filter-circle-xmark text-3xl mb-3"></i>
+          <p class="mb-4">No products match these filters.</p>
+          <button type="button" id="facet-reset-2" class="btn btn-line btn-sm">Clear filters</button>
+        </div>
+      </div>
+    </div>
   </div>`
 }
 
@@ -161,7 +208,141 @@ export function CategoryPage(data: { category: Category; deals: Deal[]; pillars:
       <div class="grid md:grid-cols-3 gap-8">${pillars.map(PostCard).join('')}</div>
     </section>` : ''}
     ${SectionHeader('Every pick', 'The list')}
-    ${DealGrid(deals)}
+    <div class="grid lg:grid-cols-[260px_1fr] gap-10" id="facet-page">
+      ${FacetSidebar(deals)}
+      <div>
+        <div class="flex items-center justify-between mb-6 pb-4 border-b border-line">
+          <p class="text-sm text-ink-mute"><span id="facet-count" class="font-semibold text-ink">${deals.length}</span> product${deals.length === 1 ? '' : 's'}</p>
+        </div>
+        <div id="facet-results">${DealGrid(deals, false, undefined, true)}</div>
+        <div id="facet-empty" class="is-hidden text-center py-20 text-ink-faint">
+          <i class="fas fa-filter-circle-xmark text-3xl mb-3"></i>
+          <p class="mb-4">No products match these filters.</p>
+          <button type="button" id="facet-reset-2" class="btn btn-line btn-sm">Clear filters</button>
+        </div>
+      </div>
+    </div>
+  </div>`
+}
+
+// ============================================================
+// HUB INDEX — the hub-and-spoke landing
+// ============================================================
+export function HubIndexPage(data: { hubs: Hub[] }): string {
+  const { hubs } = data
+  const cards = hubs
+    .map(
+      (h) => `<a href="/best/${h.slug}" class="card group flex flex-col h-full overflow-hidden">
+      <div class="card-img aspect-[16/10] bg-panel relative">
+        ${h.cover_image ? `<img src="${h.cover_image}" alt="${h.title}" loading="lazy" width="640" height="400" class="w-full h-full object-cover" />` : `<div class="w-full h-full flex items-center justify-center text-ink-faint"><i class="fas fa-layer-group text-4xl"></i></div>`}
+        <span class="absolute top-4 left-4 pill pill-ink">Curated</span>
+      </div>
+      <div class="p-7 flex flex-col flex-1">
+        <h3 class="font-serif text-2xl leading-snug text-ink mb-2 group-hover:text-accent transition">${h.title}</h3>
+        ${h.dek ? `<p class="text-ink-mute leading-relaxed line-clamp-3">${h.dek}</p>` : ''}
+        <span class="mt-auto pt-5 text-sm font-medium text-accent link-underline w-max">Explore the picks <i class="fas fa-arrow-right text-xs"></i></span>
+      </div>
+    </a>`
+    )
+    .join('')
+
+  return `<div class="max-w-editorial mx-auto px-5 py-16">
+    ${Breadcrumbs([{ name: 'Home', url: '/' }, { name: 'Best Of' }])}
+    <header class="max-w-2xl mb-16">
+      <div class="eyebrow mb-4 flex items-center gap-3"><span class="kicker-rule"></span>Hubs</div>
+      <h1 class="font-serif text-4xl md:text-5xl text-ink leading-tight">Best-of collections</h1>
+      <p class="mt-5 text-lg text-ink-soft leading-relaxed">Hand-built shortlists that pull together our top-rated, best-value picks for a specific need — each one linked through to the full review.</p>
+    </header>
+    ${hubs.length ? `<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">${cards}</div>` : '<p class="text-ink-faint py-16 text-center">No collections yet.</p>'}
+  </div>`
+}
+
+// ============================================================
+// HUB (spoke aggregator) — auto internal-linked roundup
+// ============================================================
+export function HubPage(data: { hub: Hub; deals: Deal[]; relatedHubs: Hub[]; sourcePath: string }): string {
+  const { hub, deals, relatedHubs, sourcePath } = data
+  const lead = deals[0]
+  const top = deals.slice(0, 3)
+
+  // "Jump links" — automatic internal linking to each spoke review.
+  const jump = deals
+    .map(
+      (d, i) =>
+        `<a href="/reviews/${d.slug}" class="flex items-center gap-2.5 text-sm text-ink-soft hover:text-accent transition py-1">
+          <span class="font-serif text-accent w-6">${i + 1}.</span><span class="line-clamp-1">${d.title}</span>
+        </a>`
+    )
+    .join('')
+
+  return `<div class="max-w-editorial mx-auto px-5 py-12">
+    ${Breadcrumbs([{ name: 'Home', url: '/' }, { name: 'Best Of', url: '/best' }, { name: hub.title }])}
+
+    <header class="max-w-3xl mb-12">
+      <div class="eyebrow mb-4 flex items-center gap-3"><span class="kicker-rule"></span>Curated collection · ${deals.length} picks</div>
+      <h1 class="font-serif text-4xl md:text-[3.4rem] leading-[1.06] text-ink">${hub.title}</h1>
+      ${hub.dek ? `<p class="mt-6 font-serif italic text-xl md:text-2xl text-ink-soft leading-relaxed">${hub.dek}</p>` : ''}
+    </header>
+
+    ${hub.intro ? `<div class="max-w-reading mb-12">${AffiliateNotice()}<div class="prose-area">${renderMarkdown(hub.intro)}</div></div>` : AffiliateNotice()}
+
+    ${deals.length ? `
+    <!-- At a glance: comparison matrix (lazy-revealed) -->
+    <section class="my-14" data-lazy-matrix>
+      <div class="eyebrow mb-3">At a glance</div>
+      <h2 class="font-serif text-3xl text-ink mb-6">How the picks compare</h2>
+      <div class="matrix-placeholder skeleton h-72 w-full"></div>
+      <div class="matrix-real is-hidden">${ComparisonMatrix(deals, sourcePath)}</div>
+    </section>
+
+    <!-- Contents (automatic internal links to spokes) -->
+    <section class="my-14 grid lg:grid-cols-[1fr_280px] gap-12 items-start">
+      <div>
+        ${SectionHeader('The picks, ranked', 'Our shortlist')}
+        <div class="grid sm:grid-cols-2 gap-6">${deals.map((d, i) => DealCard(d, { rank: i + 1, sourcePath, compare: true })).join('')}</div>
+      </div>
+      <aside class="card p-6 lg:sticky lg:top-24">
+        <div class="eyebrow eyebrow-mute mb-4">In this guide</div>
+        <nav class="space-y-1">${jump}</nav>
+      </aside>
+    </section>` : '<p class="text-ink-faint py-16 text-center">Picks coming soon.</p>'}
+
+    ${relatedHubs.length ? `<section class="mt-20 pt-16 border-t border-line">
+      ${SectionHeader('More collections', 'Keep exploring', { text: 'All collections', href: '/best' })}
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        ${relatedHubs.map((h) => `<a href="/best/${h.slug}" class="card p-6 group flex flex-col">
+          <h3 class="font-serif text-xl text-ink group-hover:text-accent transition leading-snug">${h.title}</h3>
+          ${h.dek ? `<p class="text-sm text-ink-mute mt-2 line-clamp-2">${h.dek}</p>` : ''}
+          <span class="mt-auto pt-4 text-sm text-accent link-underline w-max">View <i class="fas fa-arrow-right text-xs"></i></span>
+        </a>`).join('')}
+      </div>
+    </section>` : ''}
+  </div>
+  ${NewsletterBox()}`
+}
+
+// ============================================================
+// COMPARE — client-driven matrix from selected products
+// ============================================================
+export function ComparePage(data: { deals: Deal[]; sourcePath: string }): string {
+  const { deals, sourcePath } = data
+  return `<div class="max-w-editorial mx-auto px-5 py-16">
+    ${Breadcrumbs([{ name: 'Home', url: '/' }, { name: 'Compare' }])}
+    <header class="max-w-2xl mb-12">
+      <div class="eyebrow mb-4 flex items-center gap-3"><span class="kicker-rule"></span>Side by side</div>
+      <h1 class="font-serif text-4xl md:text-5xl text-ink leading-tight">Compare products</h1>
+      <p class="mt-5 text-lg text-ink-soft leading-relaxed">Tick the <strong class="text-ink">Compare</strong> button on any product to line them up here — price, rating, specs and features, side by side.</p>
+    </header>
+
+    ${deals.length >= 2
+      ? `<section id="compare-result">${ComparisonMatrix(deals, sourcePath)}</section>
+         <div class="mt-8"><a href="/deals" class="btn btn-line btn-sm"><i class="fas fa-plus"></i> Add more products</a> <button type="button" id="compare-clear" class="btn btn-ghost btn-sm ml-2">Clear all</button></div>`
+      : `<div id="compare-empty" class="text-center py-20 border border-dashed border-line rounded-2xl">
+          <i class="fas fa-scale-balanced text-4xl text-ink-faint mb-4"></i>
+          <h2 class="font-serif text-2xl text-ink mb-2">Nothing to compare yet</h2>
+          <p class="text-ink-mute mb-6 max-w-md mx-auto">Pick at least two products to see them side by side.</p>
+          <a href="/deals" class="btn btn-primary">Browse all deals <i class="fas fa-arrow-right text-xs"></i></a>
+        </div>`}
   </div>`
 }
 
@@ -296,7 +477,12 @@ export function PostPage(data: {
         <div class="eyebrow mb-3">The shortlist</div>
         <h2 class="font-serif text-3xl text-ink mb-8">Our top picks, ranked</h2>
         ${ComparisonTable(deals, sourcePath)}
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-12">${deals.map((d, i) => DealCard(d, { rank: i + 1 })).join('')}</div>
+        ${deals.length >= 2 ? `<div class="mt-14" data-lazy-matrix>
+          <h3 class="font-serif text-2xl text-ink mb-6">Full comparison</h3>
+          <div class="matrix-placeholder skeleton h-64 w-full"></div>
+          <div class="matrix-real is-hidden">${ComparisonMatrix(deals, sourcePath)}</div>
+        </div>` : ''}
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-12">${deals.map((d, i) => DealCard(d, { rank: i + 1, sourcePath, compare: true })).join('')}</div>
       </section>
     </div>` : ''}
 

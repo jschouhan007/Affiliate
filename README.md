@@ -50,11 +50,28 @@ generic template.
 - **Newsletter signup** (`POST /api/subscribe`) — stores emails in D1.
 - **SEO layer**:
   - JSON-LD: Organization, WebSite, BreadcrumbList, Article/BlogPosting, Product +
-    AggregateRating, FAQPage, ItemList.
+    AggregateRating + **Review (star ratings for SERP)**, FAQPage, ItemList.
   - Canonical tags, unique titles/descriptions, Open Graph + Twitter cards per page.
-  - Dynamic `sitemap.xml` (auto-includes all deals/posts/categories).
-  - `robots.txt` (disallows `/go/`, `/search`, `/api/`).
+  - Dynamic `sitemap.xml` (auto-includes all deals/posts/categories/**hubs**).
+  - `robots.txt` (disallows `/go/`, `/search`, `/api/`, `/compare`).
   - `rss.xml` feed for blog posts.
+
+### Phase 5 — Engagement, SEO & Performance
+- **Dynamic Hub-and-Spoke** (`/best`, `/best/:slug`) — programmatic "best-of" collections that
+  pull spoke reviews automatically by rule (`manual` curated picks, `category`, `feature`, or
+  `price` ceiling). Auto internal-links to every spoke review + sticky contents nav, comparison
+  matrix, and ItemList JSON-LD.
+- **Faceted Search & Filtering** (on `/deals` + `/category/:slug`) — sidebar filtering by
+  **price range, user rating, brand and features simultaneously**, instant client-side, no reload.
+- **Interactive Comparison Matrix** — "Compare" toggle on every product card → sticky compare
+  tray (max 4, `localStorage`) → `/compare?ids=` matrix comparing price, rating, brand, award,
+  specs and features, with lowest-price & top-rated highlights.
+- **Smart dark/light theme** — animated flame toggle, "colorful flamy" dark + warm light themes,
+  no-flash inline script, `prefers-color-scheme` fallback, localStorage memory.
+- **Performance** — strict image `width`/`height` (zero CLS), lazy images, skeleton loaders, and
+  heavy matrices lazy-revealed on scroll via `IntersectionObserver`. Respects `prefers-reduced-motion`.
+- **Rich product blog** — 10 in-depth posts (long-term reviews, head-to-heads, setup & buying
+  guides) with bylines, deks, read times, linked products, embedded matrices, and FAQ schema.
 - **Legal/compliance**: `/affiliate-disclosure`, `/privacy-policy`, `/terms-of-service`,
   `/about`, `/contact`, sitewide affiliate disclosure in footer, per-page affiliate notice,
   and a cookie-consent banner.
@@ -64,8 +81,11 @@ generic template.
 | Path | Method | Purpose |
 |---|---|---|
 | `/` | GET | Homepage |
-| `/deals` | GET | All deals |
-| `/category/:slug` | GET | Category page (e.g. `/category/mobiles`) |
+| `/deals` | GET | All deals (with faceted filter sidebar) |
+| `/category/:slug` | GET | Category page (e.g. `/category/mobiles`) with facets |
+| `/best` | GET | Hub index — all best-of collections |
+| `/best/:slug` | GET | Hub page — spokes pulled programmatically by rule |
+| `/compare?ids=1,2,3` | GET | Side-by-side comparison matrix (max 4) |
 | `/reviews/:slug` | GET | Single product review / money page |
 | `/blog` | GET | Blog index |
 | `/blog/:slug` | GET | Single post / pillar guide |

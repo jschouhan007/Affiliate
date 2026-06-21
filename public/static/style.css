@@ -2,30 +2,62 @@
    DealSpot — Editorial Design System ("Quiet Luxury")
    ============================================================ */
 
-:root {
-  /* Surfaces — warm off-white, never pure white */
-  --bg:        #FCFBF9;   /* page background */
-  --surface:   #FFFFFF;   /* cards sit very slightly above bg */
-  --surface-2: #F6F4F0;   /* tinted panels */
+/* ===== LIGHT THEME (default) — colorful warm editorial ===== */
+:root, [data-theme="light"] {
+  --bg:        #FCFBF9;
+  --surface:   #FFFFFF;
+  --surface-2: #F6F4F0;
 
-  /* Ink — deep slate, never pure black */
-  --ink:       #1C1917;   /* primary text */
-  --ink-soft:  #44403C;   /* secondary text */
-  --ink-mute:  #78716C;   /* muted / meta */
-  --ink-faint: #A8A29E;   /* captions */
+  --ink:       #1C1917;
+  --ink-soft:  #44403C;
+  --ink-mute:  #78716C;
+  --ink-faint: #A8A29E;
 
-  /* Single accent — deep terracotta */
   --accent:        #9A3F2B;
   --accent-deep:   #7E3322;
-  --accent-tint:   #F3E7E2;  /* very soft fill */
+  --accent-tint:   #F3E7E2;
   --accent-ink:    #5C2418;
+  --accent-rgb:    154,63,43;
 
-  /* Hairlines */
   --line:      #E7E5E1;
   --line-soft: #EFEDE9;
-
-  /* Editorial gold for awards/ratings (used sparingly) */
   --star:      #B08A3E;
+
+  /* "flamy" gradient used on hero accents & buy buttons */
+  --flame: linear-gradient(135deg, #F59E0B 0%, #EA580C 45%, #9A3F2B 100%);
+  --glow-rgb: 154,63,43;
+  color-scheme: light;
+}
+
+/* ===== DARK THEME — "colorful flamy" ===== */
+[data-theme="dark"] {
+  --bg:        #14100E;   /* warm near-black, not pure black */
+  --surface:   #1F1814;   /* warm charcoal card */
+  --surface-2: #271E18;
+
+  --ink:       #F7EEE7;   /* warm off-white text */
+  --ink-soft:  #D8C9BE;
+  --ink-mute:  #A8978B;
+  --ink-faint: #7C6B60;
+
+  --accent:        #FB7234;   /* vivid ember orange */
+  --accent-deep:   #F2541B;
+  --accent-tint:   #3A241A;   /* deep ember fill */
+  --accent-ink:    #FFD9B8;
+  --accent-rgb:    251,114,52;
+
+  --line:      #34281F;
+  --line-soft: #2A201A;
+  --star:      #F6B042;
+
+  --flame: linear-gradient(135deg, #FACC15 0%, #FB7234 45%, #E11D48 100%);
+  --glow-rgb: 251,114,52;
+  color-scheme: dark;
+}
+
+html { transition: background-color 0.4s ease; }
+body, .card, .btn, header, footer, input {
+  transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease;
 }
 
 /* ---- Base ---- */
@@ -123,16 +155,16 @@ h1, h2, h3, .display {
 .btn:hover  { transform: scale(1.05); }
 .btn:active { transform: scale(0.95); }
 
-/* Primary — vibrant terracotta gradient that deepens + glows on hover */
+/* Primary — vibrant flamy gradient that shifts + glows on hover */
 .btn-primary {
   color: #fff;
-  background: linear-gradient(135deg, #B14A30 0%, var(--accent) 55%, var(--accent-deep) 100%);
-  background-size: 160% 160%; background-position: 0% 50%;
-  box-shadow: 0 8px 20px -10px rgba(154,63,43,0.5);
+  background: var(--flame);
+  background-size: 180% 180%; background-position: 0% 50%;
+  box-shadow: 0 8px 20px -10px rgba(var(--glow-rgb),0.5);
 }
 .btn-primary:hover {
   background-position: 100% 50%;
-  box-shadow: 0 14px 30px -10px rgba(154,63,43,0.6);
+  box-shadow: 0 14px 32px -10px rgba(var(--glow-rgb),0.65);
 }
 
 /* Pill variant (fully rounded) */
@@ -151,15 +183,15 @@ h1, h2, h3, .display {
 /* Small CTA used inside cards */
 .btn-sm { padding: 0.55rem 0.9rem; font-size: 0.82rem; border-radius: 0.7rem; }
 
-/* "Buy Now" — the loudest, most vibrant conversion button */
+/* "Buy Now" — the loudest, most vibrant conversion button (flamy) */
 .btn-buy {
   color: #fff;
-  background: linear-gradient(135deg, #C2532F 0%, #9A3F2B 60%, #7E3322 100%);
-  background-size: 180% 180%; background-position: 0% 50%;
-  box-shadow: 0 8px 22px -10px rgba(154,63,43,0.55);
+  background: var(--flame);
+  background-size: 200% 200%; background-position: 0% 50%;
+  box-shadow: 0 8px 22px -10px rgba(var(--glow-rgb),0.6);
   font-weight: 600;
 }
-.btn-buy:hover { background-position: 100% 50%; box-shadow: 0 16px 34px -10px rgba(154,63,43,0.7); }
+.btn-buy:hover { background-position: 100% 50%; box-shadow: 0 16px 36px -10px rgba(var(--glow-rgb),0.78); }
 
 /* "View" — muted glassy secondary, must NOT compete with Buy Now */
 .btn-view {
@@ -182,9 +214,9 @@ h1, h2, h3, .display {
 .card:hover {
   transform: translateY(-0.5rem);   /* -translate-y-2 */
   box-shadow:
-    0 28px 55px -28px rgba(154,63,43,0.30),   /* terracotta-tinted diffused glow */
-    0 12px 30px -18px rgba(28,25,23,0.18);
-  border-color: var(--accent-tint);
+    0 28px 55px -28px rgba(var(--glow-rgb),0.32),   /* flamy-tinted diffused glow */
+    0 12px 30px -18px rgba(0,0,0,0.20);
+  border-color: rgba(var(--accent-rgb),0.45);
 }
 .card-img { overflow: hidden; border-top-left-radius: 1.25rem; border-top-right-radius: 1.25rem; }
 .card-img img { transition: transform 0.6s cubic-bezier(0.2,0.8,0.2,1); }
@@ -240,3 +272,102 @@ details summary { list-style: none; }
 /* subtle entrance */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 .fade-up { animation: fadeUp 0.7s cubic-bezier(0.2,0.8,0.2,1) both; }
+
+/* ============================================================
+   Theme toggle (animated sun/flame switch)
+   ============================================================ */
+.theme-toggle {
+  position: relative; width: 3.4rem; height: 1.8rem; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface-2);
+  cursor: pointer; display: inline-flex; align-items: center; padding: 0 0.2rem;
+  transition: background 0.4s ease, border-color 0.4s ease;
+  overflow: hidden;
+}
+.theme-toggle .knob {
+  position: absolute; top: 50%; left: 0.2rem; transform: translateY(-50%);
+  width: 1.4rem; height: 1.4rem; border-radius: 999px;
+  background: var(--flame); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; box-shadow: 0 2px 8px -2px rgba(var(--glow-rgb),0.7);
+  transition: transform 0.45s cubic-bezier(0.34,1.56,0.64,1);
+}
+[data-theme="dark"] .theme-toggle .knob { transform: translateY(-50%) translateX(1.6rem); }
+.theme-toggle .ico-sun, .theme-toggle .ico-moon {
+  position: absolute; font-size: 0.62rem; color: var(--ink-faint); top: 50%; transform: translateY(-50%);
+}
+.theme-toggle .ico-sun  { left: 0.45rem; }
+.theme-toggle .ico-moon { right: 0.45rem; }
+
+/* ============================================================
+   Skeleton loaders
+   ============================================================ */
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--line-soft) 37%, var(--surface-2) 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+.skel-card { border: 1px solid var(--line); border-radius: 1.25rem; overflow: hidden; background: var(--surface); }
+.is-hidden { display: none !important; }
+
+/* ============================================================
+   Faceted filter + compare UI
+   ============================================================ */
+.facet-summary { cursor: pointer; }
+.chip {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.8rem; font-weight: 500;
+  padding: 0.3rem 0.7rem; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--ink-soft); background: var(--surface);
+  cursor: pointer; transition: all 0.2s ease;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip.active { background: var(--accent-tint); border-color: var(--accent); color: var(--accent-ink); }
+
+input[type="range"]{ accent-color: var(--accent); }
+input[type="checkbox"]{ accent-color: var(--accent); width: 1rem; height: 1rem; }
+
+/* compare tray (sticky bottom) */
+.compare-tray {
+  position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%) translateY(150%);
+  z-index: 45; transition: transform 0.4s cubic-bezier(0.34,1.3,0.64,1);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 1rem;
+  box-shadow: 0 20px 50px -20px rgba(0,0,0,0.4);
+  padding: 0.7rem 0.9rem; display: flex; align-items: center; gap: 0.9rem;
+  max-width: calc(100vw - 2rem);
+}
+.compare-tray.show { transform: translateX(-50%) translateY(0); }
+.compare-thumb {
+  position: relative; width: 2.6rem; height: 2.6rem; border-radius: 0.6rem;
+  border: 1px solid var(--line); background: var(--surface-2); overflow: hidden; flex: none;
+}
+.compare-thumb img { width: 100%; height: 100%; object-fit: contain; padding: 0.2rem; }
+.compare-thumb .rm {
+  position: absolute; top: -0.35rem; right: -0.35rem; width: 1.1rem; height: 1.1rem;
+  border-radius: 999px; background: var(--ink); color: var(--bg); font-size: 0.6rem;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+
+/* add-to-compare checkbox overlay on cards */
+.compare-check {
+  position: absolute; bottom: 0.75rem; right: 0.75rem; z-index: 5;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: var(--surface); border: 1px solid var(--line);
+  padding: 0.3rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
+  color: var(--ink-soft); cursor: pointer; transition: all 0.2s ease;
+  box-shadow: 0 4px 12px -6px rgba(0,0,0,0.25);
+}
+.compare-check:hover { border-color: var(--accent); color: var(--accent); }
+.compare-check.checked { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* matrix table */
+.matrix th, .matrix td { border: 1px solid var(--line); padding: 0.85rem; vertical-align: top; }
+.matrix th { background: var(--surface-2); }
+.matrix .row-label { text-align: left; font-weight: 600; color: var(--ink); background: var(--surface-2); position: sticky; left: 0; }
+.matrix .best { color: var(--accent); font-weight: 700; }
+
+/* reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
