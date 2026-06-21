@@ -255,6 +255,13 @@ export interface PostInput {
   post_type?: string
   pillar?: number
   published?: number
+  // SEO
+  meta_title?: string
+  meta_description?: string
+  meta_keywords?: string
+  og_image?: string
+  canonical_url?: string
+  noindex?: number
 }
 
 export async function getAllPostsAdmin(db: D1Database): Promise<Post[]> {
@@ -279,8 +286,8 @@ export async function createPost(db: D1Database, p: PostInput): Promise<number> 
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
   const res = await db
     .prepare(
-      `INSERT INTO posts (slug, title, excerpt, dek, body, cover_image, category_id, author, author_role, read_minutes, post_type, pillar, published, published_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO posts (slug, title, excerpt, dek, body, cover_image, category_id, author, author_role, read_minutes, post_type, pillar, published, meta_title, meta_description, meta_keywords, og_image, canonical_url, noindex, published_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     )
     .bind(
       p.slug,
@@ -296,6 +303,12 @@ export async function createPost(db: D1Database, p: PostInput): Promise<number> 
       p.post_type || 'blog',
       p.pillar ? 1 : 0,
       p.published ? 1 : 0,
+      p.meta_title || null,
+      p.meta_description || null,
+      p.meta_keywords || null,
+      p.og_image || null,
+      p.canonical_url || null,
+      p.noindex ? 1 : 0,
       now,
       now
     )
@@ -307,7 +320,7 @@ export async function updatePost(db: D1Database, id: number, p: PostInput): Prom
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
   await db
     .prepare(
-      `UPDATE posts SET slug=?, title=?, excerpt=?, dek=?, body=?, cover_image=?, category_id=?, author=?, author_role=?, read_minutes=?, post_type=?, pillar=?, published=?, updated_at=?
+      `UPDATE posts SET slug=?, title=?, excerpt=?, dek=?, body=?, cover_image=?, category_id=?, author=?, author_role=?, read_minutes=?, post_type=?, pillar=?, published=?, meta_title=?, meta_description=?, meta_keywords=?, og_image=?, canonical_url=?, noindex=?, updated_at=?
        WHERE id=?`
     )
     .bind(
@@ -324,6 +337,12 @@ export async function updatePost(db: D1Database, id: number, p: PostInput): Prom
       p.post_type || 'blog',
       p.pillar ? 1 : 0,
       p.published ? 1 : 0,
+      p.meta_title || null,
+      p.meta_description || null,
+      p.meta_keywords || null,
+      p.og_image || null,
+      p.canonical_url || null,
+      p.noindex ? 1 : 0,
       now,
       id
     )

@@ -187,12 +187,89 @@ export function AdminEditor(data: { post?: Post; categories: Category[]; error?:
         <label class="flex items-center gap-2.5 cursor-pointer text-sm"><input type="checkbox" name="published" value="1" ${!p || p.published ? 'checked' : ''} style="width:1.1rem;height:1.1rem;accent-color:#FB7234" /> Published</label>
         <label class="flex items-center gap-2.5 cursor-pointer text-sm"><input type="checkbox" name="pillar" value="1" ${p && p.pillar ? 'checked' : ''} style="width:1.1rem;height:1.1rem;accent-color:#FB7234" /> Buying guide (pillar)</label>
       </div>
+
+      <!-- ============ SEO PANEL ============ -->
+      <section class="card p-6 mt-2">
+        <div class="flex items-center gap-2.5 mb-1">
+          <i class="fas fa-magnifying-glass-chart" style="color:#FB7234"></i>
+          <h2 class="text-xl">Search &amp; Social (SEO)</h2>
+        </div>
+        <p class="text-xs text-[#9A8E82] mb-6">Control exactly how this post appears on Google and when shared. Leave blank to fall back to the title &amp; excerpt.</p>
+
+        <!-- Live Google preview -->
+        <div class="rounded-lg p-4 mb-6" style="background:#1A1816;border:1px solid #2A2622">
+          <div class="text-[0.7rem] text-[#6b635a] uppercase tracking-wider mb-2">Google preview</div>
+          <div id="seo-prev-url" style="color:#9aa0a6;font-size:.8rem">${SITE.url}/blog/${p ? escapeHtml(p.slug) : 'your-post'}</div>
+          <div id="seo-prev-title" style="color:#8ab4f8;font-size:1.05rem;line-height:1.3;margin:.15rem 0">${escapeHtml((p && (p.meta_title || p.title)) || 'Your post title')}</div>
+          <div id="seo-prev-desc" style="color:#bdc1c6;font-size:.82rem;line-height:1.45">${escapeHtml((p && (p.meta_description || p.excerpt)) || 'Your meta description will appear here. Aim for 150–160 characters that summarise the post and entice the click.')}</div>
+        </div>
+
+        <div class="space-y-5">
+          <div>
+            <div class="flex items-center justify-between">
+              <label class="ad-label !mb-0">Meta title</label>
+              <span id="mt-count" class="text-[0.68rem] text-[#6b635a]">0 / 60</span>
+            </div>
+            <input id="seo-meta-title" name="meta_title" maxlength="70" class="ad-input mt-1.5" value="${p ? escapeAttr(p.meta_title || '') : ''}" placeholder="Defaults to the post title" />
+          </div>
+          <div>
+            <div class="flex items-center justify-between">
+              <label class="ad-label !mb-0">Meta description</label>
+              <span id="md-count" class="text-[0.68rem] text-[#6b635a]">0 / 160</span>
+            </div>
+            <textarea id="seo-meta-desc" name="meta_description" rows="2" maxlength="200" class="ad-input mt-1.5" placeholder="Defaults to the excerpt">${p ? escapeHtml(p.meta_description || '') : ''}</textarea>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label class="ad-label">Focus keywords <span class="text-[#6b635a] normal-case">(comma separated)</span></label>
+              <input name="meta_keywords" class="ad-input" value="${p ? escapeAttr(p.meta_keywords || '') : ''}" placeholder="wireless earbuds, budget, review" />
+            </div>
+            <div>
+              <label class="ad-label">Social share image (OG) URL</label>
+              <input name="og_image" class="ad-input" value="${p ? escapeAttr(p.og_image || '') : ''}" placeholder="Defaults to cover image" />
+            </div>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-4 items-end">
+            <div>
+              <label class="ad-label">Canonical URL <span class="text-[#6b635a] normal-case">(optional)</span></label>
+              <input name="canonical_url" class="ad-input" value="${p ? escapeAttr(p.canonical_url || '') : ''}" placeholder="Leave blank for default" />
+            </div>
+            <label class="flex items-center gap-2.5 cursor-pointer text-sm pb-1.5"><input type="checkbox" name="noindex" value="1" ${p && p.noindex ? 'checked' : ''} style="width:1.1rem;height:1.1rem;accent-color:#FB7234" /> Hide from search engines (noindex)</label>
+          </div>
+        </div>
+      </section>
+
       <div class="flex items-center gap-3 pt-4 border-t border-[#2A2622]">
         <button type="submit" class="ad-primary ad-btn"><i class="fas fa-floppy-disk"></i> ${isEdit ? 'Save changes' : 'Create post'}</button>
         <a href="/admin" class="ad-btn ad-line">Cancel</a>
       </div>
     </form>
-  </main>`
+  </main>
+  <script>
+  (function(){
+    var title=document.querySelector('[name=title]');
+    var slug=document.querySelector('[name=slug]');
+    var excerpt=document.querySelector('[name=excerpt]');
+    var mt=document.getElementById('seo-meta-title');
+    var md=document.getElementById('seo-meta-desc');
+    var pvTitle=document.getElementById('seo-prev-title');
+    var pvDesc=document.getElementById('seo-prev-desc');
+    var pvUrl=document.getElementById('seo-prev-url');
+    var mtCount=document.getElementById('mt-count');
+    var mdCount=document.getElementById('md-count');
+    function count(el,out,max){ if(!el||!out)return; var n=(el.value||'').length; out.textContent=n+' / '+max; out.style.color=n>max?'#F87171':(n>max*0.92?'#FBBF24':'#6b635a'); }
+    function refresh(){
+      var t=(mt&&mt.value)|| (title&&title.value) || 'Your post title';
+      var d=(md&&md.value)|| (excerpt&&excerpt.value) || 'Your meta description will appear here.';
+      if(pvTitle) pvTitle.textContent=t;
+      if(pvDesc) pvDesc.textContent=d;
+      if(pvUrl&&slug) pvUrl.textContent='${SITE.url}/blog/'+(slug.value||'your-post');
+      count(mt,mtCount,60); count(md,mdCount,160);
+    }
+    [title,slug,excerpt,mt,md].forEach(function(el){ if(el){ el.addEventListener('input',refresh); }});
+    refresh();
+  })();
+  </script>`
   return shell(isEdit ? 'Edit post' : 'New post', body, { error: data.error })
 }
 

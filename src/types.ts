@@ -81,6 +81,13 @@ export interface Post {
   published: number
   published_at: string
   updated_at: string
+  // SEO controls (editable in admin)
+  meta_title?: string
+  meta_description?: string
+  meta_keywords?: string
+  og_image?: string
+  canonical_url?: string
+  noindex?: number
 }
 
 export interface Hub {

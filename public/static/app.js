@@ -5,26 +5,52 @@
   // ---- Theme toggle ----
   var root = document.documentElement;
   var toggle = document.getElementById('theme-toggle');
+  var themeMeta = document.querySelector('meta[name="theme-color"]');
   function applyTheme(t) {
     root.setAttribute('data-theme', t);
     try { localStorage.setItem('theme', t); } catch (e) {}
     if (toggle) toggle.setAttribute('aria-checked', t === 'dark' ? 'true' : 'false');
+    if (themeMeta) themeMeta.setAttribute('content', t === 'dark' ? '#14100E' : '#FCFBF9');
   }
+  // sync meta to whatever the no-flash script already set
+  applyTheme(root.getAttribute('data-theme') || 'light');
   if (toggle) {
-    toggle.setAttribute('aria-checked', root.getAttribute('data-theme') === 'dark' ? 'true' : 'false');
     toggle.addEventListener('click', function () {
       applyTheme(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
     });
   }
 
-  // Mobile menu toggle
+  // ---- Mobile menu toggle (animated burger + slide panel) ----
   var btn = document.getElementById('mobile-menu-btn');
   var menu = document.getElementById('mobile-menu');
   if (btn && menu) {
+    function closeMenu() { menu.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); }
     btn.addEventListener('click', function () {
-      menu.classList.toggle('hidden');
+      var open = menu.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
+    // close on link tap or Escape
+    menu.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', closeMenu); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
   }
+
+  // ---- Header: shadow on scroll ----
+  var header = document.querySelector('.site-header');
+  if (header) {
+    var onScroll = function () { header.classList.toggle('scrolled', window.scrollY > 8); };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+  }
+
+  // ---- Active nav highlight (match current path) ----
+  try {
+    var path = location.pathname;
+    document.querySelectorAll('.nav-link, .mobile-link').forEach(function (a) {
+      var href = a.getAttribute('href');
+      if (!href || href === '/') return;
+      if (path === href || path.indexOf(href + '/') === 0) a.classList.add('active');
+    });
+  } catch (e) {}
 
   // Cookie consent banner
   var banner = document.getElementById('cookie-banner');

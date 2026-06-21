@@ -27,7 +27,9 @@ app.get('/favicon.ico', (c) => c.redirect('/static/logo.svg', 301))
 function page(c: any, opts: {
   title: string
   description?: string
+  keywords?: string
   canonical?: string
+  ogImage?: string
   jsonLd?: string[]
   body: string
   categories: any[]
@@ -37,7 +39,9 @@ function page(c: any, opts: {
   const doc = Layout({
     title: opts.title,
     description: opts.description,
+    keywords: opts.keywords,
     canonical: opts.canonical,
+    ogImage: opts.ogImage,
     jsonLd: opts.jsonLd,
     categories: opts.categories,
     noindex: opts.noindex,
@@ -303,9 +307,12 @@ app.get('/blog/:slug', async (c) => {
   if (faqs.length) jsonLd.push(Schema.faqSchema(faqs))
   if (deals.length) jsonLd.push(Schema.itemListSchema(deals, sourcePath))
   return page(c, {
-    title: post.title,
-    description: post.excerpt || post.title,
-    canonical: sourcePath,
+    title: post.meta_title || post.title,
+    description: post.meta_description || post.excerpt || post.dek || post.title,
+    keywords: post.meta_keywords || undefined,
+    canonical: post.canonical_url || sourcePath,
+    ogImage: post.og_image || post.cover_image || undefined,
+    noindex: !post.published || !!post.noindex,
     jsonLd,
     body,
     categories,
@@ -500,6 +507,13 @@ function parsePostBody(body: Record<string, any>): Q.PostInput {
     post_type: String(body.post_type || 'blog'),
     pillar: body.pillar ? 1 : 0,
     published: body.published ? 1 : 0,
+    // SEO
+    meta_title: String(body.meta_title || '').trim(),
+    meta_description: String(body.meta_description || '').trim(),
+    meta_keywords: String(body.meta_keywords || '').trim(),
+    og_image: String(body.og_image || '').trim(),
+    canonical_url: String(body.canonical_url || '').trim(),
+    noindex: body.noindex ? 1 : 0,
   }
 }
 

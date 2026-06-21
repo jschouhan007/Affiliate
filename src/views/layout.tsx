@@ -4,6 +4,7 @@ import { SITE, type Category } from '../types'
 interface LayoutOpts {
   title: string
   description?: string
+  keywords?: string
   canonical?: string
   ogImage?: string
   jsonLd?: string[]
@@ -16,6 +17,7 @@ export function Layout(opts: LayoutOpts) {
   const {
     title,
     description = SITE.description,
+    keywords,
     canonical,
     ogImage = `${SITE.url}/static/og-default.png`,
     jsonLd = [],
@@ -23,6 +25,7 @@ export function Layout(opts: LayoutOpts) {
     children,
     noindex = false,
   } = opts
+  const ogImageUrl = ogImage && ogImage.startsWith('http') ? ogImage : `${SITE.url}${ogImage || '/static/og-default.png'}`
 
   const fullTitle = title === SITE.name ? `${SITE.name} — ${SITE.tagline}` : `${title} · ${SITE.name}`
   const canonUrl = canonical ? (canonical.startsWith('http') ? canonical : `${SITE.url}${canonical}`) : SITE.url
@@ -37,20 +40,22 @@ export function Layout(opts: LayoutOpts) {
   </script>
   <title>${fullTitle}</title>
   <meta name="description" content="${description}" />
+  ${keywords ? raw(`<meta name="keywords" content="${keywords.replace(/"/g, '&quot;')}" />`) : ''}
   <link rel="canonical" href="${canonUrl}" />
   ${noindex ? raw('<meta name="robots" content="noindex,follow" />') : raw('<meta name="robots" content="index,follow,max-image-preview:large" />')}
   <meta name="theme-color" content="#FCFBF9" />
+  <meta name="color-scheme" content="light dark" />
 
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="${SITE.name}" />
   <meta property="og:title" content="${fullTitle}" />
   <meta property="og:description" content="${description}" />
   <meta property="og:url" content="${canonUrl}" />
-  <meta property="og:image" content="${ogImage}" />
+  <meta property="og:image" content="${ogImageUrl}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${fullTitle}" />
   <meta name="twitter:description" content="${description}" />
-  <meta name="twitter:image" content="${ogImage}" />
+  <meta name="twitter:image" content="${ogImageUrl}" />
 
   <link rel="icon" type="image/svg+xml" href="/static/logo.svg" />
   <link rel="alternate" type="application/rss+xml" title="${SITE.name}" href="/rss.xml" />
@@ -61,15 +66,18 @@ export function Layout(opts: LayoutOpts) {
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
+    // Colors map to CSS variables so EVERY Tailwind utility (bg-*, text-*, border-*)
+    // automatically follows the active [data-theme]. This is what makes dark mode work
+    // site-wide — never hardcode theme hex values here.
     tailwind.config = {
       theme: {
         extend: {
           colors: {
-            bg: '#FCFBF9', surface: '#FFFFFF', panel: '#F6F4F0',
-            ink: { DEFAULT: '#1C1917', soft: '#44403C', mute: '#78716C', faint: '#A8A29E' },
-            accent: { DEFAULT: '#9A3F2B', deep: '#7E3322', tint: '#F3E7E2', ink: '#5C2418' },
-            line: { DEFAULT: '#E7E5E1', soft: '#EFEDE9' },
-            star: '#B08A3E',
+            bg: 'var(--bg)', surface: 'var(--surface)', panel: 'var(--surface-2)',
+            ink: { DEFAULT: 'var(--ink)', soft: 'var(--ink-soft)', mute: 'var(--ink-mute)', faint: 'var(--ink-faint)' },
+            accent: { DEFAULT: 'var(--accent)', deep: 'var(--accent-deep)', tint: 'var(--accent-tint)', ink: 'var(--accent-ink)' },
+            line: { DEFAULT: 'var(--line)', soft: 'var(--line-soft)', strong: 'var(--line-strong)' },
+            star: 'var(--star)',
           },
           fontFamily: {
             serif: ['Playfair Display', 'Georgia', 'serif'],
@@ -125,47 +133,56 @@ function Header(categories: Category[]): string {
     .join('')
 
   return `
-  <header class="sticky top-0 z-40 bg-bg/85 backdrop-blur-md border-b border-line">
+  <header class="site-header sticky top-0 z-40">
     <div class="max-w-editorial mx-auto px-5">
-      <div class="flex items-center justify-between h-[4.5rem] gap-6">
-        <a href="/" class="flex items-center gap-2.5 group">
-          <img src="/static/logo.svg" alt="DealSpot" class="w-8 h-8" />
+      <div class="flex items-center justify-between h-[4.5rem] gap-4 lg:gap-6">
+        <a href="/" class="flex items-center gap-2.5 group shrink-0">
+          <img src="/static/logo.svg" alt="DealSpot" class="w-8 h-8 transition-transform duration-500 group-hover:rotate-[18deg] group-hover:scale-110" />
           <span class="font-serif text-2xl font-bold tracking-tight text-ink">DealSpot</span>
         </a>
-        <nav class="hidden md:flex items-center gap-7 text-[0.92rem] font-medium text-ink-soft">
-          <a href="/deals" class="link-underline hover:text-ink">Deals</a>
-          <div class="relative group">
-            <button class="link-underline hover:text-ink flex items-center gap-1.5">Categories <i class="fas fa-chevron-down text-[0.6rem] mt-0.5 text-ink-faint"></i></button>
-            <div class="absolute left-1/2 -translate-x-1/2 top-full pt-3 hidden group-hover:block">
-              <div class="bg-surface shadow-[0_24px_60px_-30px_rgba(28,25,23,0.4)] rounded border border-line p-2 min-w-[230px]">${catLinks}</div>
+        <nav class="hidden md:flex items-center gap-1 text-[0.92rem] font-medium">
+          <a href="/deals" class="nav-link">Deals</a>
+          <div class="relative nav-dropdown">
+            <button class="nav-link flex items-center gap-1.5" aria-haspopup="true" aria-expanded="false">Categories <i class="fas fa-chevron-down text-[0.6rem] transition-transform duration-300 nav-caret"></i></button>
+            <div class="nav-menu absolute left-1/2 -translate-x-1/2 top-full pt-3">
+              <div class="bg-surface shadow-[0_24px_60px_-26px_rgba(0,0,0,0.45)] rounded-2xl border border-line p-2 min-w-[240px]">${catLinks}</div>
             </div>
           </div>
-          <a href="/best" class="link-underline hover:text-ink">Best Of</a>
-          <a href="/guides" class="link-underline hover:text-ink">Buying Guides</a>
-          <a href="/blog" class="link-underline hover:text-ink">Journal</a>
-          <a href="/about" class="link-underline hover:text-ink">About</a>
+          <a href="/best" class="nav-link">Best Of</a>
+          <a href="/guides" class="nav-link">Buying Guides</a>
+          <a href="/blog" class="nav-link">Journal</a>
+          <a href="/about" class="nav-link">About</a>
         </nav>
-        <div class="flex items-center gap-3">
-          <form action="/search" method="get" class="hidden sm:flex items-center border-b border-line focus-within:border-ink transition pb-1">
-            <i class="fas fa-search text-ink-faint text-xs"></i>
-            <input type="text" name="q" placeholder="Search" class="bg-transparent outline-none text-sm px-2 w-24 lg:w-36 placeholder:text-ink-faint" />
+        <div class="flex items-center gap-2.5 shrink-0">
+          <form action="/search" method="get" class="search-bar hidden sm:flex items-center" role="search">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" name="q" placeholder="Search reviews…" aria-label="Search" class="search-input" />
+            <button type="submit" class="search-submit" aria-label="Submit search"><i class="fas fa-arrow-right"></i></button>
           </form>
           ${ThemeToggle()}
-          <button id="mobile-menu-btn" class="md:hidden p-2 text-ink" aria-label="Menu"><i class="fas fa-bars text-lg"></i></button>
+          <button id="mobile-menu-btn" class="mobile-burger md:hidden" aria-label="Menu" aria-expanded="false">
+            <span></span><span></span><span></span>
+          </button>
         </div>
       </div>
     </div>
-    <div id="mobile-menu" class="hidden md:hidden border-t border-line bg-surface px-5 py-4 space-y-1">
-      <a href="/deals" class="block px-2 py-2 text-ink-soft hover:text-accent">Deals</a>
-      <a href="/best" class="block px-2 py-2 text-ink-soft hover:text-accent">Best Of</a>
-      <a href="/guides" class="block px-2 py-2 text-ink-soft hover:text-accent">Buying Guides</a>
-      <a href="/blog" class="block px-2 py-2 text-ink-soft hover:text-accent">Journal</a>
-      <a href="/about" class="block px-2 py-2 text-ink-soft hover:text-accent">About</a>
-      <div class="pt-2 mt-2 border-t border-line-soft">${catLinks}</div>
-      <form action="/search" method="get" class="flex items-center border border-line rounded px-3 py-2 mt-3">
-        <i class="fas fa-search text-ink-faint text-sm"></i>
-        <input type="text" name="q" placeholder="Search" class="bg-transparent outline-none text-sm px-2 flex-1" />
-      </form>
+    <div id="mobile-menu" class="mobile-menu md:hidden">
+      <div class="px-5 py-4 space-y-1">
+        <a href="/deals" class="mobile-link">Deals</a>
+        <a href="/best" class="mobile-link">Best Of</a>
+        <a href="/guides" class="mobile-link">Buying Guides</a>
+        <a href="/blog" class="mobile-link">Journal</a>
+        <a href="/about" class="mobile-link">About</a>
+        <details class="mobile-cats">
+          <summary class="mobile-link flex items-center justify-between cursor-pointer">Categories <i class="fas fa-chevron-down text-[0.7rem] transition-transform"></i></summary>
+          <div class="pt-1 pl-1">${catLinks}</div>
+        </details>
+        <form action="/search" method="get" class="search-bar search-bar--mobile flex items-center mt-3" role="search">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" name="q" placeholder="Search reviews…" aria-label="Search" class="search-input flex-1" />
+          <button type="submit" class="search-submit" aria-label="Submit search"><i class="fas fa-arrow-right"></i></button>
+        </form>
+      </div>
     </div>
   </header>`
 }

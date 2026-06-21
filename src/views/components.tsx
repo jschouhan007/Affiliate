@@ -153,15 +153,15 @@ export function DealCard(
       ${award ? `<span class="absolute top-4 right-4 pill pill-ink">${award}</span>` : ''}
       ${compareBtn}
     </div>
-    <div class="p-5 flex flex-col flex-1">
-      ${deal.category_name ? `<a href="/category/${deal.category_slug}" class="eyebrow text-[0.66rem] mb-2 block">${deal.category_name}</a>` : ''}
-      <h3 class="font-serif text-lg leading-snug text-ink mb-2 line-clamp-2"><a href="/reviews/${deal.slug}" class="hover:text-accent transition">${deal.title}</a></h3>
-      ${deal.verdict ? `<p class="text-sm text-ink-mute italic leading-relaxed line-clamp-2 mb-3 font-serif">${deal.verdict}</p>` : ''}
+    <div class="p-5 flex flex-col flex-1 min-w-0">
+      ${deal.category_name ? `<a href="/category/${deal.category_slug}" class="eyebrow text-[0.66rem] mb-2 block truncate">${deal.category_name}</a>` : ''}
+      <h3 class="font-sans font-semibold text-[1.02rem] leading-snug text-ink mb-2 line-clamp-2 break-words"><a href="/reviews/${deal.slug}" class="hover:text-accent transition">${deal.title}</a></h3>
+      ${deal.verdict ? `<p class="text-sm text-ink-mute leading-relaxed line-clamp-2 mb-3 break-words">${deal.verdict}</p>` : ''}
       ${deal.rating ? `<div class="flex items-center gap-2 mb-3">${stars(deal.rating, 'text-xs')}<span class="text-xs text-ink-faint">${deal.rating.toFixed(1)}</span></div>` : '<div class="mb-3"></div>'}
       <div class="mt-auto pt-4 border-t border-line-soft">
-        <div class="flex items-baseline gap-2 mb-3.5">
+        <div class="flex items-baseline flex-wrap gap-x-2 gap-y-1 mb-3.5">
           ${cheapest
-            ? `<span class="text-[0.66rem] uppercase tracking-[0.1em] text-ink-faint">From</span><span class="font-serif text-xl text-ink">${formatPrice(cheapest.price, cheapest.currency)}</span>${cheapest.original_price && disc ? `<span class="text-sm line-through text-ink-faint">${formatPrice(cheapest.original_price, cheapest.currency)}</span>` : ''}`
+            ? `<span class="text-[0.66rem] uppercase tracking-[0.1em] text-ink-faint">From</span><span class="font-sans font-bold text-xl text-ink">${formatPrice(cheapest.price, cheapest.currency)}</span>${cheapest.original_price && disc ? `<span class="text-sm line-through text-ink-faint">${formatPrice(cheapest.original_price, cheapest.currency)}</span>` : ''}`
             : '<span class="text-sm text-ink-faint">Price on retailer site</span>'}
         </div>
         ${DualCardCta(deal, source)}
