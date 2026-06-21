@@ -48,6 +48,9 @@ export interface Deal {
   rating_count: number
   pros?: string
   cons?: string
+  tested_by?: string
+  verdict?: string
+  award?: string
   featured: number
   published: number
   created_at: string
@@ -66,6 +69,9 @@ export interface Post {
   category_slug?: string
   category_name?: string
   author: string
+  author_role?: string
+  read_minutes?: number
+  dek?: string
   post_type: string
   pillar: number
   published: number
@@ -84,9 +90,9 @@ export interface Faq {
 
 export const SITE = {
   name: 'DealSpot',
-  tagline: 'Hand-picked best deals from Amazon, Flipkart & more',
+  tagline: 'Tested recommendations, honestly reviewed',
   description:
-    'DealSpot finds and verifies the best deals across mobiles, tech, appliances, home, and outdoor gear from Amazon, Flipkart and other Indian retailers — with honest reviews and buying guides.',
+    'DealSpot is an independent reviews publication. We test and research products across mobiles, tech, appliances, home and outdoor gear — then recommend only what is genuinely worth your money, with the best current price from Amazon, Flipkart and more.',
   // Update this to your real domain after deployment.
   url: 'https://dealspot.pages.dev',
   twitter: '@dealspot',

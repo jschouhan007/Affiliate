@@ -1,21 +1,191 @@
-/* DealSpot custom styles */
-:root { --brand: #4f46e5; }
+/* ============================================================
+   DealSpot — Editorial Design System ("Quiet Luxury")
+   ============================================================ */
+
+:root {
+  /* Surfaces — warm off-white, never pure white */
+  --bg:        #FCFBF9;   /* page background */
+  --surface:   #FFFFFF;   /* cards sit very slightly above bg */
+  --surface-2: #F6F4F0;   /* tinted panels */
+
+  /* Ink — deep slate, never pure black */
+  --ink:       #1C1917;   /* primary text */
+  --ink-soft:  #44403C;   /* secondary text */
+  --ink-mute:  #78716C;   /* muted / meta */
+  --ink-faint: #A8A29E;   /* captions */
+
+  /* Single accent — deep terracotta */
+  --accent:        #9A3F2B;
+  --accent-deep:   #7E3322;
+  --accent-tint:   #F3E7E2;  /* very soft fill */
+  --accent-ink:    #5C2418;
+
+  /* Hairlines */
+  --line:      #E7E5E1;
+  --line-soft: #EFEDE9;
+
+  /* Editorial gold for awards/ratings (used sparingly) */
+  --star:      #B08A3E;
+}
+
+/* ---- Base ---- */
+* { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 
 html { scroll-behavior: smooth; }
-body { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
 
-/* line clamp utilities (fallback if Tailwind CDN lacks them) */
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-feature-settings: "ss01", "cv01", "cv02";
+  line-height: 1.7;
+  letter-spacing: -0.003em;
+}
+
+/* ---- Typography ---- */
+.font-serif { font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; }
+.font-sans  { font-family: 'Inter', system-ui, sans-serif; }
+
+h1, h2, h3, .display {
+  font-family: 'Playfair Display', Georgia, serif;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+}
+
+.eyebrow {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.eyebrow-mute { color: var(--ink-mute); }
+
+.kicker-rule { width: 2.5rem; height: 2px; background: var(--accent); }
+
+/* Body prose for markdown article bodies */
+.prose-area {
+  color: var(--ink-soft);
+  font-size: 1.075rem;
+  line-height: 1.78;
+  max-width: 42rem;
+}
+.prose-area > * + * { margin-top: 1.35rem; }
+.prose-area h1, .prose-area h2, .prose-area h3 {
+  font-family: 'Playfair Display', serif;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.prose-area h2 { font-size: 1.7rem; margin-top: 2.75rem; }
+.prose-area h3 { font-size: 1.3rem; margin-top: 2rem; }
+.prose-area p  { margin: 1.1rem 0; }
+.prose-area a  { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.prose-area a:hover { color: var(--accent-deep); }
+.prose-area strong { color: var(--ink); font-weight: 600; }
+.prose-area ul, .prose-area ol { margin: 1.1rem 0; padding-left: 1.25rem; }
+.prose-area li { margin: 0.4rem 0; }
+.prose-area blockquote {
+  border-left: 2px solid var(--accent);
+  padding-left: 1.25rem;
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 1.25rem;
+  color: var(--ink);
+}
+.prose-area table { width: 100%; border-collapse: collapse; margin: 1.75rem 0; font-size: 0.95rem; }
+.prose-area th, .prose-area td { border-bottom: 1px solid var(--line); padding: 0.7rem 0.5rem; text-align: left; }
+.prose-area th { color: var(--ink); font-weight: 600; }
+.prose-area code { background: var(--surface-2); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
+.prose-area img { border-radius: 6px; }
+.prose-area hr { border: none; border-top: 1px solid var(--line); margin: 2.5rem 0; }
+
+/* Drop cap for editorial flair (first letter of article) */
+.dropcap > p:first-of-type::first-letter {
+  font-family: 'Playfair Display', serif;
+  float: left;
+  font-size: 3.6rem;
+  line-height: 0.78;
+  padding: 0.3rem 0.6rem 0 0;
+  color: var(--accent);
+}
+
+/* ---- Components ---- */
+.btn {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.9rem;
+  padding: 0.7rem 1.25rem; border-radius: 2px;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+  letter-spacing: 0.01em;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-deep); }
+.btn-ghost { border: 1px solid var(--ink); color: var(--ink); background: transparent; }
+.btn-ghost:hover { background: var(--ink); color: var(--bg); }
+.btn-line { border: 1px solid var(--line); color: var(--ink); background: var(--surface); }
+.btn-line:hover { border-color: var(--ink); }
+
+/* Card — hairline border, barely-there shadow */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  transition: transform 0.4s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.4s, border-color 0.4s;
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 40px -24px rgba(28,25,23,0.25);
+  border-color: var(--line-soft);
+}
+.card-img { overflow: hidden; }
+.card-img img { transition: transform 0.7s cubic-bezier(0.2,0.8,0.2,1); }
+.card:hover .card-img img { transform: scale(1.04); }
+
+/* Link with animated underline */
+.link-underline { position: relative; }
+.link-underline::after {
+  content: ''; position: absolute; left: 0; bottom: -2px; height: 1px; width: 0;
+  background: currentColor; transition: width 0.35s ease;
+}
+.link-underline:hover::after { width: 100%; }
+
+/* Minimalist rating stars */
+.stars { color: var(--star); letter-spacing: 0.08em; }
+
+/* Award / trust pill */
+.pill {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-family: 'Inter', sans-serif; font-size: 0.68rem; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 0.3rem 0.6rem; border-radius: 2px;
+}
+.pill-accent { background: var(--accent-tint); color: var(--accent-ink); }
+.pill-ink    { background: var(--ink); color: var(--bg); }
+.pill-line   { border: 1px solid var(--line); color: var(--ink-soft); }
+
+/* Avatar (author byline) */
+.avatar {
+  width: 2.25rem; height: 2.25rem; border-radius: 50%;
+  background: var(--accent-tint); color: var(--accent-ink);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 0.8rem; font-family: 'Inter', sans-serif;
+  border: 1px solid var(--line);
+}
+
+/* line clamp */
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* prose styling for markdown-rendered article bodies */
-.prose-area { color: #334155; line-height: 1.75; }
-.prose-area h1, .prose-area h2, .prose-area h3 { color: #0f172a; }
-.prose-area a { color: var(--brand); }
-.prose-area a:hover { text-decoration: underline; }
-.prose-area table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
-.prose-area th, .prose-area td { border: 1px solid #e2e8f0; padding: 0.5rem 0.75rem; text-align: left; }
-.prose-area th { background: #f1f5f9; }
-.prose-area code { background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 0.3rem; font-size: 0.9em; }
+/* Editorial divider */
+.rule { border: none; border-top: 1px solid var(--line); }
 
 details summary::-webkit-details-marker { display: none; }
+details summary { list-style: none; }
+
+/* selection */
+::selection { background: var(--accent-tint); color: var(--accent-ink); }
+
+/* subtle entrance */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.fade-up { animation: fadeUp 0.7s cubic-bezier(0.2,0.8,0.2,1) both; }

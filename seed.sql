@@ -174,3 +174,50 @@ INSERT INTO faqs (parent_type, parent_id, question, answer, sort_order) VALUES
   ('post', (SELECT id FROM posts WHERE slug='best-5g-phones-under-15000'), 'Is 5G worth it under ₹15,000?', 'Yes, if you plan to keep the phone 2-3 years. 5G coverage in India is now widespread, and the price premium for 5G at this budget is small.', 1),
   ('deal', (SELECT id FROM deals WHERE slug='redmi-13c-5g'), 'Does the Redmi 13C 5G support all Indian 5G bands?', 'Yes, it supports the major 5G bands used by Jio and Airtel in India.', 1),
   ('deal', (SELECT id FROM deals WHERE slug='boat-airdopes-141'), 'What is the real battery life of the Airdopes 141?', 'You get roughly 5-6 hours per charge from the buds and around 42 hours total including the case, depending on volume.', 1);
+
+-- ============================================================
+-- Editorial trust data (verdicts, tested_by, awards)
+-- ============================================================
+UPDATE deals SET tested_by='Aarav Mehta', award='Editor''s Choice',
+  verdict='The most phone you can buy under ₹11,000 — and it doesn''t feel like a compromise.'
+  WHERE slug='redmi-13c-5g';
+UPDATE deals SET tested_by='Priya Nair', award='Best Value',
+  verdict='Unbeatable battery life for the price. The default pick for casual listeners.'
+  WHERE slug='boat-airdopes-141';
+UPDATE deals SET tested_by='Priya Nair',
+  verdict='A genuinely bright AMOLED and reliable calling, let down only by a fiddly app.'
+  WHERE slug='noise-colorfit-pro-5';
+UPDATE deals SET tested_by='Sunita Rao', award='Editor''s Choice',
+  verdict='The kitchen workhorse we keep recommending. Powerful, durable, and fairly priced.'
+  WHERE slug='prestige-iris-mixer';
+UPDATE deals SET tested_by='Vikram Singh',
+  verdict='The best value daypack in India. It simply outlasts bags twice the price.'
+  WHERE slug='decathlon-quechua-backpack';
+UPDATE deals SET tested_by='Priya Nair', award='Best ANC under ₹4k',
+  verdict='Real noise cancellation and Hi-Res audio at a price that used to buy neither.'
+  WHERE slug='realme-buds-air-6';
+UPDATE deals SET tested_by='Aarav Mehta', award='Best Mid-Range',
+  verdict='100W charging and a gorgeous screen make this the value champion of the segment.'
+  WHERE slug='oneplus-nord-ce4';
+UPDATE deals SET tested_by='Sunita Rao',
+  verdict='Replaces a drawer full of appliances and frees up your stovetop. Worth the learning curve.'
+  WHERE slug='instant-pot-duo';
+UPDATE deals SET tested_by='Vikram Singh',
+  verdict='Good cushioning and grip at a fair price — a sensible first mat.'
+  WHERE slug='boldfit-yoga-mat';
+UPDATE deals SET tested_by='Aarav Mehta', award='Best Streaming Stick',
+  verdict='The easiest, cheapest way to make any TV genuinely smart.'
+  WHERE slug='fire-tv-stick-4k';
+
+UPDATE posts SET author='Priya Nair', author_role='Senior Audio Editor', read_minutes=8,
+  dek='We lived with the most popular budget earbuds for weeks. These are the only two worth your money.'
+  WHERE slug='best-budget-earbuds-under-2000';
+UPDATE posts SET author='Aarav Mehta', author_role='Mobile Editor', read_minutes=9,
+  dek='Sub-₹15,000 is where 5G value lives in 2026. Here is exactly what to buy, and why.'
+  WHERE slug='best-5g-phones-under-15000';
+UPDATE posts SET author='Rohan Desai', author_role='Consumer Editor', read_minutes=6,
+  dek='That "60% off" tag is often hiding an inflated original price. Here is how to never get fooled again.'
+  WHERE slug='how-to-spot-a-fake-discount';
+UPDATE posts SET author='Sunita Rao', author_role='Home & Kitchen Editor', read_minutes=7,
+  dek='From everyday dal to heavy masala prep, the mixer grinders that actually earn their place on your counter.'
+  WHERE slug='best-mixer-grinder-india';

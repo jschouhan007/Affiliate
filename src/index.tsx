@@ -164,15 +164,15 @@ app.get('/blog', async (c) => {
   ])
   const body = Pages.BlogIndexPage({
     posts,
-    title: 'The Blog',
-    subtitle: 'Tips, comparisons, how-tos and deal news.',
-    crumbs: [{ name: 'Home', url: '/' }, { name: 'Blog' }],
+    title: 'The Journal',
+    subtitle: 'Considered writing on the things we test — comparisons, how-tos, and the occasional opinion.',
+    crumbs: [{ name: 'Home', url: '/' }, { name: 'Journal' }],
   })
   return page(c, {
-    title: 'Blog',
-    description: 'Buying tips, product comparisons and how-tos to help you shop smarter.',
+    title: 'The Journal',
+    description: 'Considered writing on the products we test — buying tips, comparisons and how-tos.',
     canonical: '/blog',
-    jsonLd: [Schema.breadcrumbSchema([{ name: 'Home', url: '/' }, { name: 'Blog', url: '/blog' }])],
+    jsonLd: [Schema.breadcrumbSchema([{ name: 'Home', url: '/' }, { name: 'Journal', url: '/blog' }])],
     body,
     categories,
   })

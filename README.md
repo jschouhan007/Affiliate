@@ -12,6 +12,23 @@
   Tailwind (CDN). This is the lightweight edge-native adaptation of the original
   Next.js + Supabase master plan — every architectural goal is preserved.
 
+## Design System — "Quiet Luxury" Editorial
+A bespoke, high-end editorial look (Wirecutter / Kinfolk register) — deliberately *not* a
+generic template.
+- **Palette**: warm off-white `#FCFBF9` background · deep slate ink `#1C1917` (never pure
+  black) · single sophisticated accent **deep terracotta** `#9A3F2B`, used sparingly for
+  links, primary buttons and rules only.
+- **Typography**: **Playfair Display** for headings (tight tracking, editorial serif) +
+  **Inter** for body at line-height ~1.75. Drop caps on long-form articles.
+- **Layout**: generous whitespace (`py-16`–`py-24`), asymmetric 60/40 & 7/5 editorial
+  splits (large lead + stacked secondary), hairline `1px` borders instead of heavy shadows,
+  barely-there hover shadow + `-translate-y-1` lift.
+- **Affiliate / trust**: understated "Check Price at [Retailer]" and "Read review" CTAs
+  (no aggressive BUY NOW), "Editor's Choice" / "Best Value" award pills, "Tested by [Name]"
+  badges, author bylines with role + read time, minimalist gold rating stars.
+- Tokens live in `public/static/style.css` (CSS variables) and `tailwind.config` in
+  `src/views/layout.tsx`.
+
 ## Live / Dev URLs
 - **Local dev (sandbox)**: served on port 3000 via PM2 + `wrangler pages dev`
 - **Public sandbox URL**: (use GetServiceUrl / Deploy tab — regenerated per session)
@@ -137,4 +154,4 @@ npm run db:reset
 - Cloudflare Pages + Workers runtime · Cloudflare D1 (SQLite)
 - Tailwind CSS (CDN) · Font Awesome (CDN)
 
-**Last Updated**: 2026-06-21
+**Last Updated**: 2026-06-21 (editorial "Quiet Luxury" redesign)
