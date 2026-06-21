@@ -1,1 +1,21 @@
-h1 { font-family: Arial, Helvetica, sans-serif; }
+/* DealSpot custom styles */
+:root { --brand: #4f46e5; }
+
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+
+/* line clamp utilities (fallback if Tailwind CDN lacks them) */
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* prose styling for markdown-rendered article bodies */
+.prose-area { color: #334155; line-height: 1.75; }
+.prose-area h1, .prose-area h2, .prose-area h3 { color: #0f172a; }
+.prose-area a { color: var(--brand); }
+.prose-area a:hover { text-decoration: underline; }
+.prose-area table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+.prose-area th, .prose-area td { border: 1px solid #e2e8f0; padding: 0.5rem 0.75rem; text-align: left; }
+.prose-area th { background: #f1f5f9; }
+.prose-area code { background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 0.3rem; font-size: 0.9em; }
+
+details summary::-webkit-details-marker { display: none; }
