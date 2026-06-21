@@ -240,6 +240,102 @@ export async function getDealsByIds(db: D1Database, ids: number[]): Promise<Deal
   return safe.map((id) => deals.find((d) => d.id === id)).filter(Boolean) as Deal[]
 }
 
+// ---- Admin: post CRUD ----
+export interface PostInput {
+  slug: string
+  title: string
+  excerpt?: string
+  dek?: string
+  body: string
+  cover_image?: string
+  category_id?: number | null
+  author?: string
+  author_role?: string
+  read_minutes?: number | null
+  post_type?: string
+  pillar?: number
+  published?: number
+}
+
+export async function getAllPostsAdmin(db: D1Database): Promise<Post[]> {
+  const { results } = await db
+    .prepare(POST_SELECT + ' ORDER BY p.updated_at DESC')
+    .all<Post>()
+  return results || []
+}
+
+export async function getPostById(db: D1Database, id: number): Promise<Post | null> {
+  return await db.prepare(POST_SELECT + ' WHERE p.id = ?').bind(id).first<Post>()
+}
+
+export async function slugExists(db: D1Database, slug: string, exceptId?: number): Promise<boolean> {
+  const row = exceptId
+    ? await db.prepare('SELECT id FROM posts WHERE slug = ? AND id != ?').bind(slug, exceptId).first<{ id: number }>()
+    : await db.prepare('SELECT id FROM posts WHERE slug = ?').bind(slug).first<{ id: number }>()
+  return !!row
+}
+
+export async function createPost(db: D1Database, p: PostInput): Promise<number> {
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  const res = await db
+    .prepare(
+      `INSERT INTO posts (slug, title, excerpt, dek, body, cover_image, category_id, author, author_role, read_minutes, post_type, pillar, published, published_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    )
+    .bind(
+      p.slug,
+      p.title,
+      p.excerpt || null,
+      p.dek || null,
+      p.body,
+      p.cover_image || null,
+      p.category_id ?? null,
+      p.author || 'DealSpot Editorial',
+      p.author_role || 'Editorial',
+      p.read_minutes ?? null,
+      p.post_type || 'blog',
+      p.pillar ? 1 : 0,
+      p.published ? 1 : 0,
+      now,
+      now
+    )
+    .run()
+  return res.meta.last_row_id as number
+}
+
+export async function updatePost(db: D1Database, id: number, p: PostInput): Promise<void> {
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  await db
+    .prepare(
+      `UPDATE posts SET slug=?, title=?, excerpt=?, dek=?, body=?, cover_image=?, category_id=?, author=?, author_role=?, read_minutes=?, post_type=?, pillar=?, published=?, updated_at=?
+       WHERE id=?`
+    )
+    .bind(
+      p.slug,
+      p.title,
+      p.excerpt || null,
+      p.dek || null,
+      p.body,
+      p.cover_image || null,
+      p.category_id ?? null,
+      p.author || 'DealSpot Editorial',
+      p.author_role || 'Editorial',
+      p.read_minutes ?? null,
+      p.post_type || 'blog',
+      p.pillar ? 1 : 0,
+      p.published ? 1 : 0,
+      now,
+      id
+    )
+    .run()
+}
+
+export async function deletePost(db: D1Database, id: number): Promise<void> {
+  await db.prepare('DELETE FROM post_deals WHERE post_id = ?').bind(id).run()
+  await db.prepare("DELETE FROM faqs WHERE parent_type='post' AND parent_id = ?").bind(id).run()
+  await db.prepare('DELETE FROM posts WHERE id = ?').bind(id).run()
+}
+
 export async function getRelatedDeals(
   db: D1Database,
   categoryId: number | undefined,

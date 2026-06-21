@@ -72,6 +72,24 @@ generic template.
   heavy matrices lazy-revealed on scroll via `IntersectionObserver`. Respects `prefers-reduced-motion`.
 - **Rich product blog** — 10 in-depth posts (long-term reviews, head-to-heads, setup & buying
   guides) with bylines, deks, read times, linked products, embedded matrices, and FAQ schema.
+
+### Admin Blog Editor (private)
+A self-contained, password-protected CMS at **`/admin`** for writing and managing blog posts —
+no third-party CMS required, fully Cloudflare-Workers-native (Web Crypto auth, D1 storage).
+- **Login**: `/admin/login` — password checked server-side against the `ADMIN_PASSWORD` secret.
+  On success an HMAC-signed, 12-hour cookie token (signed with `ADMIN_SECRET`) is issued.
+- **Dashboard**: lists all posts (published + drafts) with view/edit/delete actions.
+- **Editor**: full Markdown body editor + title, auto-slug, dek, excerpt, cover image, category,
+  type, read-time, author/role, and Published / Buying-guide (pillar) toggles. Slug-uniqueness
+  validated. New posts appear instantly on `/blog`, the sitemap and RSS.
+- **Security**: `/admin*` is `noindex,nofollow` and disallowed in `robots.txt`; cookie is
+  `HttpOnly; Secure; SameSite=Lax`.
+- **Setup secrets** (production):
+  ```bash
+  npx wrangler pages secret put ADMIN_PASSWORD   # your private password
+  npx wrangler pages secret put ADMIN_SECRET      # any long random string for signing
+  ```
+  Local dev reads these from `.dev.vars` (git-ignored). Default local password: `dealspot-admin`.
 - **Legal/compliance**: `/affiliate-disclosure`, `/privacy-policy`, `/terms-of-service`,
   `/about`, `/contact`, sitewide affiliate disclosure in footer, per-page affiliate notice,
   and a cookie-consent banner.
@@ -86,6 +104,12 @@ generic template.
 | `/best` | GET | Hub index — all best-of collections |
 | `/best/:slug` | GET | Hub page — spokes pulled programmatically by rule |
 | `/compare?ids=1,2,3` | GET | Side-by-side comparison matrix (max 4) |
+| `/admin` | GET | **Admin dashboard** (auth-gated) — list/manage posts |
+| `/admin/login` | GET/POST | Admin sign-in (password) |
+| `/admin/new` | GET/POST | Create a blog post (Markdown editor) |
+| `/admin/edit/:id` | GET/POST | Edit a post |
+| `/admin/delete/:id` | POST | Delete a post |
+| `/admin/logout` | POST | Sign out |
 | `/reviews/:slug` | GET | Single product review / money page |
 | `/blog` | GET | Blog index |
 | `/blog/:slug` | GET | Single post / pillar guide |

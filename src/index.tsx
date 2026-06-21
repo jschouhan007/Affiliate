@@ -5,8 +5,10 @@ import type { Bindings } from './types'
 import { SITE } from './types'
 import { Layout } from './views/layout'
 import * as Pages from './views/pages'
+import * as Admin from './views/admin'
 import * as Q from './lib/queries'
 import * as Schema from './lib/schema'
+import * as Auth from './lib/auth'
 import {
   AFFILIATE_DISCLOSURE,
   PRIVACY_POLICY,
@@ -431,11 +433,136 @@ for (const [path, { title, md }] of Object.entries(staticPages)) {
 }
 
 // ============================================================
+// ADMIN — secure blog editor (password + signed cookie)
+// ============================================================
+async function requireAdmin(c: any): Promise<boolean> {
+  const token = Auth.readCookie(c.req.header('cookie'))
+  return await Auth.verifyToken(token, c.env)
+}
+
+// Login screen
+app.get('/admin/login', async (c) => {
+  if (await requireAdmin(c)) return c.redirect('/admin', 302)
+  return c.html(Admin.AdminLogin() as any)
+})
+
+app.post('/admin/login', async (c) => {
+  const body = await c.req.parseBody()
+  const password = String(body.password || '')
+  if (!Auth.checkPassword(password, c.env)) {
+    c.status(401)
+    return c.html(Admin.AdminLogin({ error: 'Incorrect password. Try again.' }) as any)
+  }
+  const token = await Auth.createToken(c.env)
+  c.header('Set-Cookie', Auth.cookieHeader(token))
+  return c.redirect('/admin', 302)
+})
+
+app.post('/admin/logout', (c) => {
+  c.header('Set-Cookie', Auth.clearCookieHeader())
+  return c.redirect('/admin/login', 302)
+})
+
+// Dashboard
+app.get('/admin', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const posts = await Q.getAllPostsAdmin(c.env.DB)
+  const flash = c.req.query('flash') || undefined
+  return c.html(Admin.AdminDashboard({ posts, flash }) as any)
+})
+
+// New post form
+app.get('/admin/new', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const categories = await Q.getCategories(c.env.DB)
+  return c.html(Admin.AdminEditor({ categories }) as any)
+})
+
+function parsePostBody(body: Record<string, any>): Q.PostInput {
+  const slug = String(body.slug || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+  const rm = parseInt(String(body.read_minutes || ''), 10)
+  const cat = parseInt(String(body.category_id || ''), 10)
+  return {
+    slug,
+    title: String(body.title || '').trim(),
+    excerpt: String(body.excerpt || '').trim(),
+    dek: String(body.dek || '').trim(),
+    body: String(body.body || ''),
+    cover_image: String(body.cover_image || '').trim(),
+    category_id: Number.isFinite(cat) ? cat : null,
+    author: String(body.author || '').trim(),
+    author_role: String(body.author_role || '').trim(),
+    read_minutes: Number.isFinite(rm) ? rm : null,
+    post_type: String(body.post_type || 'blog'),
+    pillar: body.pillar ? 1 : 0,
+    published: body.published ? 1 : 0,
+  }
+}
+
+// Create post
+app.post('/admin/new', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const categories = await Q.getCategories(c.env.DB)
+  const input = parsePostBody(await c.req.parseBody())
+  if (!input.title || !input.slug || !input.body) {
+    c.status(400)
+    return c.html(Admin.AdminEditor({ categories, error: 'Title, slug and body are required.' }) as any)
+  }
+  if (await Q.slugExists(c.env.DB, input.slug)) {
+    c.status(400)
+    return c.html(Admin.AdminEditor({ categories, error: `Slug "${input.slug}" already exists. Choose another.` }) as any)
+  }
+  await Q.createPost(c.env.DB, input)
+  return c.redirect('/admin?flash=' + encodeURIComponent('Post created.'), 302)
+})
+
+// Edit post form
+app.get('/admin/edit/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const id = parseInt(c.req.param('id'), 10)
+  const [post, categories] = await Promise.all([Q.getPostById(c.env.DB, id), Q.getCategories(c.env.DB)])
+  if (!post) return c.redirect('/admin?flash=' + encodeURIComponent('Post not found.'), 302)
+  return c.html(Admin.AdminEditor({ post, categories }) as any)
+})
+
+// Update post
+app.post('/admin/edit/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const id = parseInt(c.req.param('id'), 10)
+  const categories = await Q.getCategories(c.env.DB)
+  const post = await Q.getPostById(c.env.DB, id)
+  if (!post) return c.redirect('/admin?flash=' + encodeURIComponent('Post not found.'), 302)
+  const input = parsePostBody(await c.req.parseBody())
+  if (!input.title || !input.slug || !input.body) {
+    c.status(400)
+    return c.html(Admin.AdminEditor({ post: { ...post, ...input } as any, categories, error: 'Title, slug and body are required.' }) as any)
+  }
+  if (await Q.slugExists(c.env.DB, input.slug, id)) {
+    c.status(400)
+    return c.html(Admin.AdminEditor({ post: { ...post, ...input } as any, categories, error: `Slug "${input.slug}" is already used by another post.` }) as any)
+  }
+  await Q.updatePost(c.env.DB, id, input)
+  return c.redirect('/admin?flash=' + encodeURIComponent('Post updated.'), 302)
+})
+
+// Delete post
+app.post('/admin/delete/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const id = parseInt(c.req.param('id'), 10)
+  await Q.deletePost(c.env.DB, id)
+  return c.redirect('/admin?flash=' + encodeURIComponent('Post deleted.'), 302)
+})
+
+// ============================================================
 // SITEMAP + ROBOTS + RSS
 // ============================================================
 app.get('/robots.txt', (c) => {
   return c.text(
-    `User-agent: *\nAllow: /\nDisallow: /go/\nDisallow: /search\nDisallow: /api/\n\nSitemap: ${SITE.url}/sitemap.xml\n`,
+    `User-agent: *\nAllow: /\nDisallow: /go/\nDisallow: /search\nDisallow: /api/\nDisallow: /admin\nDisallow: /compare\n\nSitemap: ${SITE.url}/sitemap.xml\n`,
     200,
     { 'Content-Type': 'text/plain' }
   )

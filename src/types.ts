@@ -1,5 +1,7 @@
 export type Bindings = {
   DB: D1Database
+  ADMIN_PASSWORD?: string
+  ADMIN_SECRET?: string
 }
 
 export interface Category {
