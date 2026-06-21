@@ -111,36 +111,87 @@ h1, h2, h3, .display {
   color: var(--accent);
 }
 
-/* ---- Components ---- */
+/* ---- Buttons (animated, rounded, conversion-optimized) ---- */
 .btn {
-  display: inline-flex; align-items: center; gap: 0.5rem;
-  font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.9rem;
-  padding: 0.7rem 1.25rem; border-radius: 2px;
-  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-  letter-spacing: 0.01em;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.9rem;
+  padding: 0.72rem 1.4rem; border-radius: 0.85rem;   /* rounded-xl */
+  transition: transform 0.3s ease-in-out, background 0.3s ease-in-out,
+              box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out, color 0.3s ease-in-out;
+  letter-spacing: 0.005em; will-change: transform; cursor: pointer;
 }
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { background: var(--accent-deep); }
-.btn-ghost { border: 1px solid var(--ink); color: var(--ink); background: transparent; }
-.btn-ghost:hover { background: var(--ink); color: var(--bg); }
-.btn-line { border: 1px solid var(--line); color: var(--ink); background: var(--surface); }
-.btn-line:hover { border-color: var(--ink); }
+.btn:hover  { transform: scale(1.05); }
+.btn:active { transform: scale(0.95); }
 
-/* Card — hairline border, barely-there shadow */
+/* Primary — vibrant terracotta gradient that deepens + glows on hover */
+.btn-primary {
+  color: #fff;
+  background: linear-gradient(135deg, #B14A30 0%, var(--accent) 55%, var(--accent-deep) 100%);
+  background-size: 160% 160%; background-position: 0% 50%;
+  box-shadow: 0 8px 20px -10px rgba(154,63,43,0.5);
+}
+.btn-primary:hover {
+  background-position: 100% 50%;
+  box-shadow: 0 14px 30px -10px rgba(154,63,43,0.6);
+}
+
+/* Pill variant (fully rounded) */
+.btn-pill { border-radius: 999px; }
+
+/* Ghost — ink outline, fills on hover */
+.btn-ghost { border: 1.5px solid var(--ink); color: var(--ink); background: transparent; }
+.btn-ghost:hover { background: var(--ink); color: var(--bg); }
+
+/* Line / secondary — muted outline */
+.btn-line {
+  border: 2px solid var(--line); color: var(--ink); background: var(--surface);
+}
+.btn-line:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Small CTA used inside cards */
+.btn-sm { padding: 0.55rem 0.9rem; font-size: 0.82rem; border-radius: 0.7rem; }
+
+/* "Buy Now" — the loudest, most vibrant conversion button */
+.btn-buy {
+  color: #fff;
+  background: linear-gradient(135deg, #C2532F 0%, #9A3F2B 60%, #7E3322 100%);
+  background-size: 180% 180%; background-position: 0% 50%;
+  box-shadow: 0 8px 22px -10px rgba(154,63,43,0.55);
+  font-weight: 600;
+}
+.btn-buy:hover { background-position: 100% 50%; box-shadow: 0 16px 34px -10px rgba(154,63,43,0.7); }
+
+/* "View" — muted glassy secondary, must NOT compete with Buy Now */
+.btn-view {
+  border: 2px solid var(--line);
+  color: var(--ink-soft);
+  background: rgba(246,244,240,0.7);
+  backdrop-filter: blur(4px);
+  font-weight: 600;
+}
+.btn-view:hover { border-color: var(--ink); color: var(--ink); background: var(--surface-2); }
+
+/* ---- Card — soft, dynamic, accent-tinted glow on hover ---- */
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 4px;
-  transition: transform 0.4s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.4s, border-color 0.4s;
+  border-radius: 1.25rem;   /* rounded-2xl */
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
+  will-change: transform;
 }
 .card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 18px 40px -24px rgba(28,25,23,0.25);
-  border-color: var(--line-soft);
+  transform: translateY(-0.5rem);   /* -translate-y-2 */
+  box-shadow:
+    0 28px 55px -28px rgba(154,63,43,0.30),   /* terracotta-tinted diffused glow */
+    0 12px 30px -18px rgba(28,25,23,0.18);
+  border-color: var(--accent-tint);
 }
-.card-img { overflow: hidden; }
-.card-img img { transition: transform 0.7s cubic-bezier(0.2,0.8,0.2,1); }
-.card:hover .card-img img { transform: scale(1.04); }
+.card-img { overflow: hidden; border-top-left-radius: 1.25rem; border-top-right-radius: 1.25rem; }
+.card-img img { transition: transform 0.6s cubic-bezier(0.2,0.8,0.2,1); }
+.card:hover .card-img img { transform: scale(1.06); }
+
+/* When an image fills a non-top region (e.g. small thumb), keep all corners rounded */
+.card-img.rounded-all { border-radius: 1rem; }
 
 /* Link with animated underline */
 .link-underline { position: relative; }

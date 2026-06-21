@@ -53,7 +53,7 @@ export function Breadcrumbs(items: { name: string; url?: string }[]): string {
   </nav>`
 }
 
-// ---- Understated CTA routed through /go/:slug ----
+// ---- CTA routed through /go/:slug ----
 export function CtaButton(offer: Offer, sourcePath: string, variant: 'primary' | 'line' = 'primary'): string {
   if (!offer.affiliate_slug) return ''
   const meta = retailerMeta(offer.retailer)
@@ -61,8 +61,26 @@ export function CtaButton(offer: Offer, sourcePath: string, variant: 'primary' |
   const cls = variant === 'primary' ? 'btn btn-primary' : 'btn btn-line'
   return `<a href="${href}" rel="nofollow sponsored noopener" target="_blank" class="${cls}">
     Check Price at ${meta.name}
-    <i class="fas fa-arrow-right text-[0.7rem]"></i>
+    <i class="fas fa-arrow-up-right-from-square text-[0.7rem]"></i>
   </a>`
+}
+
+// ---- Dual card CTAs: vibrant "Buy Now ↗" + muted "View →" ----
+export function DualCardCta(deal: Deal, sourcePath: string): string {
+  const cheapest = (deal.offers || [])
+    .filter((o) => o.affiliate_slug)
+    .sort((a, b) => (a.price ?? 1e12) - (b.price ?? 1e12))[0]
+  const view = `<a href="/reviews/${deal.slug}" class="btn btn-view btn-sm flex-1">View <i class="fas fa-arrow-right text-[0.7rem]"></i></a>`
+  if (!cheapest) {
+    // No buyable offer — make View the full-width primary action instead
+    return `<div class="flex gap-2.5"><a href="/reviews/${deal.slug}" class="btn btn-primary btn-sm flex-1">View Review <i class="fas fa-arrow-right text-[0.7rem]"></i></a></div>`
+  }
+  const meta = retailerMeta(cheapest.retailer)
+  const buyHref = `/go/${cheapest.affiliate_slug}?from=${encodeURIComponent(sourcePath)}`
+  const buy = `<a href="${buyHref}" rel="nofollow sponsored noopener" target="_blank" class="btn btn-buy btn-sm flex-1" title="Buy on ${meta.name}">
+    <i class="fas fa-cart-shopping text-[0.72rem]"></i> Buy Now <i class="fas fa-arrow-up-right-from-square text-[0.62rem] opacity-80"></i>
+  </a>`
+  return `<div class="flex gap-2.5">${buy}${view}</div>`
 }
 
 // ---- Price comparison box (editorial, hairline rows) ----
@@ -96,19 +114,21 @@ export function PriceBox(deal: Deal, sourcePath: string): string {
     <p class="text-xs text-ink-faint mt-3 flex items-center gap-1.5"><i class="fas fa-circle-info"></i>Prices verified ${timeAgo(deal.updated_at)}. We may earn a commission — at no cost to you.</p>`
 }
 
-// ---- Editor's Pick card ----
-export function DealCard(deal: Deal, opts: { rank?: number } = {}): string {
+// ---- Editor's Pick card (dual CTAs, zoom image, lift + glow) ----
+export function DealCard(deal: Deal, opts: { rank?: number; sourcePath?: string } = {}): string {
   const cheapest = (deal.offers || [])
     .filter((o) => o.price != null)
     .sort((a, b) => (a.price as number) - (b.price as number))[0]
   const disc = cheapest ? discountPct(cheapest.price, cheapest.original_price) : null
   const award = deal.award || (deal.featured ? "Editor's Pick" : '')
+  const source = opts.sourcePath || `/reviews/${deal.slug}`
 
   return `<article class="card group flex flex-col h-full">
     <a href="/reviews/${deal.slug}" class="card-img block relative aspect-[5/4] bg-panel">
       ${deal.image_url
         ? `<img src="${deal.image_url}" alt="${deal.title}" loading="lazy" class="w-full h-full object-contain p-6" />`
         : `<div class="w-full h-full flex items-center justify-center text-ink-faint"><i class="fas fa-box-open text-4xl"></i></div>`}
+      ${disc ? `<span class="absolute bottom-4 left-4 pill pill-accent shadow-sm">−${disc}%</span>` : ''}
       ${opts.rank ? `<span class="absolute top-4 left-4 font-serif text-lg text-ink bg-surface/90 backdrop-blur w-9 h-9 flex items-center justify-center rounded-full border border-line">${opts.rank}</span>` : ''}
       ${award ? `<span class="absolute top-4 right-4 pill pill-ink">${award}</span>` : ''}
     </a>
@@ -116,22 +136,24 @@ export function DealCard(deal: Deal, opts: { rank?: number } = {}): string {
       ${deal.category_name ? `<a href="/category/${deal.category_slug}" class="eyebrow text-[0.66rem] mb-2 block">${deal.category_name}</a>` : ''}
       <h3 class="font-serif text-lg leading-snug text-ink mb-2 line-clamp-2"><a href="/reviews/${deal.slug}" class="hover:text-accent transition">${deal.title}</a></h3>
       ${deal.verdict ? `<p class="text-sm text-ink-mute italic leading-relaxed line-clamp-2 mb-3 font-serif">${deal.verdict}</p>` : ''}
-      ${deal.rating ? `<div class="flex items-center gap-2 mb-4">${stars(deal.rating, 'text-xs')}<span class="text-xs text-ink-faint">${deal.rating.toFixed(1)}</span></div>` : '<div class="mb-4"></div>'}
-      <div class="mt-auto pt-4 border-t border-line-soft flex items-center justify-between">
-        ${cheapest
-          ? `<div><div class="text-[0.66rem] uppercase tracking-[0.1em] text-ink-faint">From</div><span class="font-serif text-lg text-ink">${formatPrice(cheapest.price, cheapest.currency)}</span></div>`
-          : '<span class="text-sm text-ink-faint">Check price</span>'}
-        <a href="/reviews/${deal.slug}" class="text-sm font-medium text-accent link-underline">Read review</a>
+      ${deal.rating ? `<div class="flex items-center gap-2 mb-3">${stars(deal.rating, 'text-xs')}<span class="text-xs text-ink-faint">${deal.rating.toFixed(1)}</span></div>` : '<div class="mb-3"></div>'}
+      <div class="mt-auto pt-4 border-t border-line-soft">
+        <div class="flex items-baseline gap-2 mb-3.5">
+          ${cheapest
+            ? `<span class="text-[0.66rem] uppercase tracking-[0.1em] text-ink-faint">From</span><span class="font-serif text-xl text-ink">${formatPrice(cheapest.price, cheapest.currency)}</span>${cheapest.original_price && disc ? `<span class="text-sm line-through text-ink-faint">${formatPrice(cheapest.original_price, cheapest.currency)}</span>` : ''}`
+            : '<span class="text-sm text-ink-faint">Price on retailer site</span>'}
+        </div>
+        ${DualCardCta(deal, source)}
       </div>
     </div>
   </article>`
 }
 
-export function DealGrid(deals: Deal[], ranked = false): string {
+export function DealGrid(deals: Deal[], ranked = false, sourcePath?: string): string {
   if (!deals.length)
     return `<div class="text-center py-20 text-ink-faint"><i class="fas fa-box-open text-3xl mb-3"></i><p>Nothing here yet — check back soon.</p></div>`
   return `<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">${deals
-    .map((d, i) => DealCard(d, ranked ? { rank: i + 1 } : {}))
+    .map((d, i) => DealCard(d, { rank: ranked ? i + 1 : undefined, sourcePath }))
     .join('')}</div>`
 }
 
