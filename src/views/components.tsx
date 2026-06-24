@@ -241,7 +241,7 @@ export function PostCard(post: Post): string {
         : `<div class="w-full h-full flex items-center justify-center text-ink-faint"><i class="fas fa-feather text-3xl"></i></div>`}
     </a>
     <div class="p-6 flex flex-col flex-1">
-      <div class="eyebrow text-[0.66rem] mb-3">${post.pillar ? 'Buying Guide' : post.category_name || 'Journal'}</div>
+      <div class="eyebrow text-[0.66rem] mb-3">${post.pillar ? 'Buying Guide' : post.category_name || 'Article'}</div>
       <h3 class="font-serif text-xl leading-snug text-ink mb-2 line-clamp-2"><a href="/blog/${post.slug}" class="hover:text-accent transition">${post.title}</a></h3>
       <p class="text-[0.95rem] text-ink-mute line-clamp-2 leading-relaxed mb-5">${post.dek || post.excerpt || ''}</p>
       <div class="mt-auto pt-4 border-t border-line-soft flex items-center justify-between text-xs text-ink-faint">

@@ -131,11 +131,15 @@ function ThemeToggle(): string {
 }
 
 function TopBar(): string {
+  // Scrolling marquee (right → left). The message is repeated so the strip
+  // never shows a gap, and the whole track loops seamlessly.
+  const msg = `<span class="topbar__item"><i class="fas fa-vial-circle-check"></i> Independent &amp; reader-supported — we test before we recommend</span>`
   return `
-  <div class="topbar text-[0.72rem] tracking-[0.14em] uppercase font-medium">
-    <div class="topbar__inner max-w-editorial mx-auto px-5 h-9 flex items-center justify-center gap-2">
-      <i class="fas fa-vial-circle-check"></i>
-      <span>Independent &amp; reader-supported — we test before we recommend</span>
+  <div class="topbar text-[0.72rem] tracking-[0.14em] uppercase font-medium" role="marquee" aria-label="Independent and reader-supported — we test before we recommend">
+    <div class="topbar__inner h-9 flex items-center overflow-hidden">
+      <div class="topbar__track">
+        ${msg}${msg}${msg}${msg}
+      </div>
     </div>
   </div>`
 }
@@ -168,8 +172,6 @@ function Header(categories: Category[]): string {
           </div>
           <a href="/best" class="nav-link">Best Of</a>
           <a href="/guides" class="nav-link">Buying Guides</a>
-          <a href="/blog" class="nav-link">Journal</a>
-          <a href="/about" class="nav-link">About</a>
         </nav>
         <div class="flex items-center gap-2.5 shrink-0">
           <form action="/search" method="get" class="search-bar hidden sm:flex items-center" role="search">
@@ -189,8 +191,6 @@ function Header(categories: Category[]): string {
         <a href="/deals" class="mobile-link">Deals</a>
         <a href="/best" class="mobile-link">Best Of</a>
         <a href="/guides" class="mobile-link">Buying Guides</a>
-        <a href="/blog" class="mobile-link">Journal</a>
-        <a href="/about" class="mobile-link">About</a>
         <details class="mobile-cats">
           <summary class="mobile-link flex items-center justify-between cursor-pointer">Categories <i class="fas fa-chevron-down text-[0.7rem] transition-transform"></i></summary>
           <div class="pt-1 pl-1">${catLinks}</div>
@@ -231,8 +231,8 @@ function Footer(categories: Category[]): string {
           <h4 class="eyebrow eyebrow-mute mb-4">Explore</h4>
           <ul class="space-y-2.5 text-[0.95rem]">
             <li><a href="/deals" class="text-ink-mute hover:text-accent transition">All Deals</a></li>
+            <li><a href="/best" class="text-ink-mute hover:text-accent transition">Best Of</a></li>
             <li><a href="/guides" class="text-ink-mute hover:text-accent transition">Buying Guides</a></li>
-            <li><a href="/blog" class="text-ink-mute hover:text-accent transition">The Journal</a></li>
             <li><a href="/about" class="text-ink-mute hover:text-accent transition">About Us</a></li>
             <li><a href="/contact" class="text-ink-mute hover:text-accent transition">Contact</a></li>
           </ul>

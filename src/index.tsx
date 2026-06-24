@@ -229,41 +229,24 @@ app.get('/reviews/:slug', async (c) => {
 })
 
 // ============================================================
-// BLOG
+// BLOG — the standalone "Journal" page was removed. All posts now
+// live under Buying Guides (/guides). Keep this 301 so old links,
+// bookmarks and search-engine results don't break.
 // ============================================================
-app.get('/blog', async (c) => {
-  const db = c.env.DB
-  const [categories, posts] = await Promise.all([
-    Q.getCategories(db),
-    Q.getPosts(db, { limit: 40 }),
-  ])
-  const body = Pages.BlogIndexPage({
-    posts,
-    title: 'The Journal',
-    subtitle: 'Considered writing on the things we test — comparisons, how-tos, and the occasional opinion.',
-    crumbs: [{ name: 'Home', url: '/' }, { name: 'Journal' }],
-  })
-  return page(c, {
-    title: 'The Journal',
-    description: 'Considered writing on the products we test — buying tips, comparisons and how-tos.',
-    canonical: '/blog',
-    jsonLd: [Schema.breadcrumbSchema([{ name: 'Home', url: '/' }, { name: 'Journal', url: '/blog' }])],
-    body,
-    categories,
-  })
-})
+app.get('/blog', (c) => c.redirect('/guides', 301))
 
-// GUIDES (pillar pages list)
+// GUIDES — buying guides + all published articles (formerly "Journal")
 app.get('/guides', async (c) => {
   const db = c.env.DB
   const [categories, posts] = await Promise.all([
     Q.getCategories(db),
-    Q.getPosts(db, { pillar: true, limit: 40 }),
+    // Show every post (guides + articles) so anything published surfaces here.
+    Q.getPosts(db, { limit: 60 }),
   ])
   const body = Pages.BlogIndexPage({
     posts,
     title: 'Buying Guides',
-    subtitle: 'In-depth "best of" roundups that compare your best options.',
+    subtitle: 'In-depth "best of" roundups and hands-on articles to help you choose well.',
     crumbs: [{ name: 'Home', url: '/' }, { name: 'Buying Guides' }],
   })
   return page(c, {
@@ -300,7 +283,7 @@ app.get('/blog/:slug', async (c) => {
     Schema.articleSchema(post),
     Schema.breadcrumbSchema([
       { name: 'Home', url: '/' },
-      { name: post.pillar ? 'Guides' : 'Blog', url: post.pillar ? '/guides' : '/blog' },
+      { name: 'Buying Guides', url: '/guides' },
       { name: post.title, url: sourcePath },
     ]),
   ]
@@ -609,7 +592,7 @@ app.get('/sitemap.xml', async (c) => {
     Q.getPosts(db, { limit: 1000 }),
     Q.getHubs(db),
   ])
-  const staticUrls = ['', '/deals', '/best', '/blog', '/guides', '/about', '/contact', '/affiliate-disclosure', '/privacy-policy', '/terms-of-service']
+  const staticUrls = ['', '/deals', '/best', '/guides', '/about', '/contact', '/affiliate-disclosure', '/privacy-policy', '/terms-of-service']
   const urls: { loc: string; lastmod?: string; priority: string }[] = []
   for (const s of staticUrls) urls.push({ loc: SITE.url + s, priority: s === '' ? '1.0' : '0.7' })
   for (const cat of categories) urls.push({ loc: `${SITE.url}/category/${cat.slug}`, priority: '0.8' })

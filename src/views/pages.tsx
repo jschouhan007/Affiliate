@@ -144,7 +144,7 @@ export function HomePage(data: {
   ${posts.length ? `
   <div class="max-w-editorial mx-auto px-5">
     <section class="py-20 border-t border-line">
-      ${SectionHeader('From the Journal', 'Reading', { text: 'The Journal', href: '/blog' })}
+      ${SectionHeader('Latest Articles & Guides', 'Reading', { text: 'Buying Guides', href: '/guides' })}
       <div class="grid md:grid-cols-3 gap-8">${posts.map(PostCard).join('')}</div>
     </section>
   </div>` : ''}`
@@ -427,7 +427,7 @@ export function BlogIndexPage(data: { posts: Post[]; title: string; subtitle: st
     ${hero ? `<a href="/blog/${hero.slug}" class="group grid lg:grid-cols-12 gap-10 items-center mb-20 pb-20 border-b border-line">
       <div class="lg:col-span-7 card-img aspect-[16/10] bg-panel rounded overflow-hidden border border-line">${hero.cover_image ? `<img src="${hero.cover_image}" alt="${hero.title}" class="w-full h-full object-cover group-hover:scale-[1.03] transition duration-700" />` : `<div class="w-full h-full flex items-center justify-center text-ink-faint"><i class="fas fa-feather text-4xl"></i></div>`}</div>
       <div class="lg:col-span-5">
-        <div class="eyebrow mb-4">${hero.pillar ? 'Buying Guide' : hero.category_name || 'Journal'}</div>
+        <div class="eyebrow mb-4">${hero.pillar ? 'Buying Guide' : hero.category_name || 'Article'}</div>
         <h2 class="font-serif text-3xl md:text-4xl leading-tight text-ink mb-4 group-hover:text-accent transition">${hero.title}</h2>
         <p class="text-ink-soft leading-relaxed mb-6">${hero.dek || hero.excerpt || ''}</p>
         <div class="text-sm text-ink-mute">${hero.author} · ${formatDate(hero.published_at)}${hero.read_minutes ? ` · ${hero.read_minutes} min read` : ''}</div>
@@ -452,11 +452,11 @@ export function PostPage(data: {
     <div class="max-w-reading mx-auto px-5">
       ${Breadcrumbs([
         { name: 'Home', url: '/' },
-        { name: post.pillar ? 'Guides' : 'Journal', url: post.pillar ? '/guides' : '/blog' },
+        { name: 'Buying Guides', url: '/guides' },
         ...(post.category_name ? [{ name: post.category_name, url: `/category/${post.category_slug}` }] : []),
         { name: post.title },
       ])}
-      <div class="eyebrow mb-5">${post.pillar ? 'Buying Guide' : post.category_name || 'Journal'}</div>
+      <div class="eyebrow mb-5">${post.pillar ? 'Buying Guide' : post.category_name || 'Article'}</div>
       <h1 class="font-serif text-4xl md:text-[3.25rem] leading-[1.06] text-ink">${post.title}</h1>
       ${post.dek || post.excerpt ? `<p class="mt-6 font-serif text-xl md:text-2xl italic text-ink-soft leading-relaxed">${post.dek || post.excerpt}</p>` : ''}
       <div class="mt-8 pb-8 border-b border-line flex items-center justify-between">
@@ -491,7 +491,7 @@ export function PostPage(data: {
 
     ${related.length ? `<div class="max-w-editorial mx-auto px-5">
       <section class="mt-12">
-        ${SectionHeader('Keep reading', 'More from the Journal')}
+        ${SectionHeader('Keep reading', 'More guides & articles')}
         <div class="grid sm:grid-cols-2 gap-8">${related.map(PostCard).join('')}</div>
       </section>
     </div>` : ''}
@@ -514,7 +514,7 @@ export function SearchPage(data: { q: string; deals: Deal[]; posts: Post[] }): s
       <p class="mt-3 text-ink-mute">${total} result${total === 1 ? '' : 's'} found.</p>
     </header>
     ${deals.length ? `<section class="mb-20">${SectionHeader('Products', 'Reviews')}${DealGrid(deals)}</section>` : ''}
-    ${posts.length ? `<section>${SectionHeader('Articles', 'Journal')}<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">${posts.map(PostCard).join('')}</div></section>` : ''}
+    ${posts.length ? `<section>${SectionHeader('Articles', 'Reading')}<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">${posts.map(PostCard).join('')}</div></section>` : ''}
     ${!total ? `<div class="text-center py-24 text-ink-faint"><i class="fas fa-magnifying-glass text-3xl mb-4"></i><p>Nothing matched. Try another term.</p></div>` : ''}
   </div>`
 }

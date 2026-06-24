@@ -14,12 +14,12 @@
    *-c vars hold raw RGB channels (for Tailwind opacity modifiers).
    The plain names resolve to rgb(...) so all CSS below works unchanged. */
 :root, [data-theme="light"] {
-  --bg-c:        248 250 252;   /* cool soft white */
-  --surface-c:   255 255 255;
-  --surface-2-c: 241 245 249;
+  --bg-c:        239 242 249;   /* soft cool lavender-grey — not stark white */
+  --surface-c:   255 255 255;   /* cards stay crisp white so they lift off the bg */
+  --surface-2-c: 232 236 245;   /* slightly deeper panel tint */
 
   --ink-c:       15 23 42;      /* slate-900 */
-  --ink-soft-c:  51 65 85;      /* slate-700 */
+  --ink-soft-c:  44 56 82;      /* slate-700-ish, a touch deeper for contrast */
   --ink-mute-c:  71 85 105;     /* slate-600 */
   --ink-faint-c: 100 116 139;   /* slate-500 */
 
@@ -29,9 +29,9 @@
   --accent-ink-c:    55 48 163;     /* indigo-800 */
   --accent-rgb:      79,70,229;
 
-  --line-c:      226 232 240;   /* slate-200 */
-  --line-soft-c: 241 245 249;
-  --line-strong-c: 203 213 225; /* slate-300 */
+  --line-c:      219 225 236;   /* soft slate border, reads on tinted bg */
+  --line-soft-c: 230 234 243;
+  --line-strong-c: 198 206 222; /* clearer divider */
   --star-c:      245 158 11;    /* amber-500 */
 
   --flame: linear-gradient(135deg, #06B6D4 0%, #6366F1 50%, #F43F5E 100%);
@@ -105,12 +105,34 @@ body, .card, .btn, header, footer, input {
 .topbar__inner {
   position: relative;
   z-index: 1;
+  width: 100%;
 }
-.topbar__inner i { color: rgba(255, 255, 255, 0.95); }
-.topbar__inner span {
+/* Scrolling marquee track: moves continuously right → left and loops.
+   The message is repeated 4× in markup; we translate by 25% so the loop
+   is seamless (the next copy lands exactly where the previous one was). */
+.topbar__track {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  width: max-content;
+  will-change: transform;
+  animation: topbar-marquee 28s linear infinite;
+}
+.topbar__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   color: #ffffff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  padding: 0 2.5rem;   /* spacing between repeats */
 }
+.topbar__item i { color: rgba(255, 255, 255, 0.95); }
+@keyframes topbar-marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-25%); }
+}
+/* Pause on hover so users can read it comfortably */
+.topbar:hover .topbar__track { animation-play-state: paused; }
 /* subtle moving sheen for a premium feel */
 .topbar::after {
   content: "";
@@ -120,6 +142,7 @@ body, .card, .btn, header, footer, input {
   background-size: 220% 100%;
   animation: topbar-sheen 7s ease-in-out infinite;
   pointer-events: none;
+  z-index: 2;
 }
 @keyframes topbar-sheen {
   0%   { background-position: 130% 0; }
@@ -128,6 +151,9 @@ body, .card, .btn, header, footer, input {
 }
 @media (prefers-reduced-motion: reduce) {
   .topbar::after { animation: none; }
+  /* Honour reduced-motion: stop scrolling and center the single message */
+  .topbar__track { animation: none; justify-content: center; width: 100%; }
+  .topbar__item:not(:first-child) { display: none; }
 }
 
 /* ---- Base ---- */
