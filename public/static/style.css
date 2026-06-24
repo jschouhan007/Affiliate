@@ -2,64 +2,132 @@
    DealSpot — Editorial Design System ("Quiet Luxury")
    ============================================================ */
 
-/* ===== LIGHT THEME (default) — colorful warm editorial ===== */
+/* ============================================================
+   THEME TOKENS
+   Colors are stored as RAW RGB CHANNELS ("r g b") so Tailwind's
+   `text-ink/80`, `bg-surface/90` opacity modifiers work correctly.
+   In layout.tsx the Tailwind config maps each token via
+   rgb(var(--x) / <alpha-value>). NEVER store hex here.
+   ============================================================ */
+
+/* ===== LIGHT THEME (default) — fresh indigo + teal, friendly =====
+   *-c vars hold raw RGB channels (for Tailwind opacity modifiers).
+   The plain names resolve to rgb(...) so all CSS below works unchanged. */
 :root, [data-theme="light"] {
-  --bg:        #FCFBF9;
-  --surface:   #FFFFFF;
-  --surface-2: #F6F4F0;
+  --bg-c:        248 250 252;   /* cool soft white */
+  --surface-c:   255 255 255;
+  --surface-2-c: 241 245 249;
 
-  --ink:       #1C1917;
-  --ink-soft:  #403B37;
-  --ink-mute:  #6B635C;   /* darkened for AA contrast */
-  --ink-faint: #877E76;   /* darkened: fine print now legible on light bg */
+  --ink-c:       15 23 42;      /* slate-900 */
+  --ink-soft-c:  51 65 85;      /* slate-700 */
+  --ink-mute-c:  71 85 105;     /* slate-600 */
+  --ink-faint-c: 100 116 139;   /* slate-500 */
 
-  --accent:        #9A3F2B;
-  --accent-deep:   #7E3322;
-  --accent-tint:   #F3E7E2;
-  --accent-ink:    #5C2418;
-  --accent-rgb:    154,63,43;
+  --accent-c:        79 70 229;     /* indigo-600 */
+  --accent-deep-c:   67 56 202;     /* indigo-700 */
+  --accent-tint-c:   238 242 255;   /* indigo-50 */
+  --accent-ink-c:    55 48 163;     /* indigo-800 */
+  --accent-rgb:      79,70,229;
 
-  --line:      #E2DED7;   /* slightly stronger hairline for clearer borders */
-  --line-soft: #ECE9E3;
-  --line-strong: #CFC9C0; /* emphasised borders (inputs, dividers) */
-  --star:      #B08A3E;
+  --line-c:      226 232 240;   /* slate-200 */
+  --line-soft-c: 241 245 249;
+  --line-strong-c: 203 213 225; /* slate-300 */
+  --star-c:      245 158 11;    /* amber-500 */
 
-  /* "flamy" gradient used on hero accents & buy buttons */
-  --flame: linear-gradient(135deg, #F59E0B 0%, #EA580C 45%, #9A3F2B 100%);
-  --glow-rgb: 154,63,43;
+  --flame: linear-gradient(135deg, #06B6D4 0%, #6366F1 50%, #F43F5E 100%);
+  --glow-rgb: 99,102,241;
   color-scheme: light;
 }
 
-/* ===== DARK THEME — "colorful flamy" ===== */
+/* ===== DARK THEME — deep navy slate + bright cyan/violet ===== */
 [data-theme="dark"] {
-  --bg:        #14100E;   /* warm near-black, not pure black */
-  --surface:   #1F1814;   /* warm charcoal card */
-  --surface-2: #271E18;
+  --bg-c:        13 17 28;
+  --surface-c:   21 27 43;
+  --surface-2-c: 30 38 59;
 
-  --ink:       #F7EEE7;   /* warm off-white text */
-  --ink-soft:  #DCCEC3;
-  --ink-mute:  #B6A599;   /* brightened for AA contrast on dark surface */
-  --ink-faint: #948377;   /* brightened: fine print legible on dark bg */
+  --ink-c:       237 242 250;
+  --ink-soft-c:  203 213 230;
+  --ink-mute-c:  155 168 192;
+  --ink-faint-c: 122 135 160;
 
-  --accent:        #FB7234;   /* vivid ember orange */
-  --accent-deep:   #F2541B;
-  --accent-tint:   #3A241A;   /* deep ember fill */
-  --accent-ink:    #FFD9B8;
-  --accent-rgb:    251,114,52;
+  --accent-c:        129 140 248;   /* indigo-400 */
+  --accent-deep-c:   165 180 252;   /* indigo-300 */
+  --accent-tint-c:   30 32 64;
+  --accent-ink-c:    199 210 254;
+  --accent-rgb:      129,140,248;
 
-  --line:      #3C2E24;   /* stronger warm border for visible separation */
-  --line-soft: #2A201A;
-  --line-strong: #503C2E; /* emphasised borders (inputs, dividers) */
-  --star:      #F6B042;
+  --line-c:      40 50 73;
+  --line-soft-c: 30 38 59;
+  --line-strong-c: 56 68 96;
+  --star-c:      251 191 36;
 
-  --flame: linear-gradient(135deg, #FACC15 0%, #FB7234 45%, #E11D48 100%);
-  --glow-rgb: 251,114,52;
+  --flame: linear-gradient(135deg, #22D3EE 0%, #818CF8 50%, #FB7185 100%);
+  --glow-rgb: 129,140,248;
   color-scheme: dark;
+}
+
+/* Resolved solid colours — used directly throughout this stylesheet.
+   These follow whichever theme block above is active. */
+:root, [data-theme="light"], [data-theme="dark"] {
+  --bg:          rgb(var(--bg-c));
+  --surface:     rgb(var(--surface-c));
+  --surface-2:   rgb(var(--surface-2-c));
+  --ink:         rgb(var(--ink-c));
+  --ink-soft:    rgb(var(--ink-soft-c));
+  --ink-mute:    rgb(var(--ink-mute-c));
+  --ink-faint:   rgb(var(--ink-faint-c));
+  --accent:      rgb(var(--accent-c));
+  --accent-deep: rgb(var(--accent-deep-c));
+  --accent-tint: rgb(var(--accent-tint-c));
+  --accent-ink:  rgb(var(--accent-ink-c));
+  --line:        rgb(var(--line-c));
+  --line-soft:   rgb(var(--line-soft-c));
+  --line-strong: rgb(var(--line-strong-c));
+  --star:        rgb(var(--star-c));
 }
 
 html { transition: background-color 0.4s ease; }
 body, .card, .btn, header, footer, input {
   transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+}
+
+/* ============================================================
+   TOP ANNOUNCEMENT BAR — brand gradient, always-legible white text
+   Uses the --flame gradient (teal → indigo → coral) so it stays
+   on-brand and high-contrast in BOTH light and dark themes.
+   ============================================================ */
+.topbar {
+  background: var(--flame);
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+}
+.topbar__inner {
+  position: relative;
+  z-index: 1;
+}
+.topbar__inner i { color: rgba(255, 255, 255, 0.95); }
+.topbar__inner span {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+/* subtle moving sheen for a premium feel */
+.topbar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+  background-size: 220% 100%;
+  animation: topbar-sheen 7s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes topbar-sheen {
+  0%   { background-position: 130% 0; }
+  60%  { background-position: -30% 0; }
+  100% { background-position: -30% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .topbar::after { animation: none; }
 }
 
 /* ---- Base ---- */

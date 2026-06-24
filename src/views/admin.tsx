@@ -14,19 +14,19 @@ function shell(title: string, body: string, opts: { flash?: string; error?: stri
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
   <style>
-    body { font-family: 'Inter', system-ui, sans-serif; background:#0F0E0D; color:#E7E2DC; }
+    body { font-family: 'Inter', system-ui, sans-serif; background:#0D111C; color:#EDF2FA; }
     h1,h2,h3 { font-family:'Playfair Display', serif; }
-    .ad-input { background:#1A1816; border:1px solid #34302B; border-radius:.6rem; padding:.65rem .9rem; width:100%; color:#F2EDE7; outline:none; transition:border-color .2s; }
-    .ad-input:focus { border-color:#FB7234; }
-    .ad-label { font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:#9A8E82; font-weight:600; margin-bottom:.4rem; display:block; }
+    .ad-input { background:#101624; border:1px solid #283249; border-radius:.6rem; padding:.65rem .9rem; width:100%; color:#EDF2FA; outline:none; transition:border-color .2s; }
+    .ad-input:focus { border-color:#818CF8; }
+    .ad-label { font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:#9BA8C0; font-weight:600; margin-bottom:.4rem; display:block; }
     .ad-btn { display:inline-flex; align-items:center; gap:.5rem; font-weight:600; padding:.6rem 1.1rem; border-radius:.6rem; cursor:pointer; transition:transform .15s, background .2s; font-size:.9rem; }
     .ad-btn:active { transform:scale(.97); }
-    .ad-primary { background:linear-gradient(135deg,#FACC15,#FB7234 45%,#E11D48); color:#fff; }
-    .ad-line { border:1px solid #34302B; color:#E7E2DC; }
-    .ad-line:hover { border-color:#FB7234; color:#FB7234; }
+    .ad-primary { background:linear-gradient(135deg,#22D3EE,#818CF8 50%,#FB7185); color:#fff; }
+    .ad-line { border:1px solid #283249; color:#EDF2FA; }
+    .ad-line:hover { border-color:#818CF8; color:#818CF8; }
     .ad-danger { color:#F87171; border:1px solid #4a2222; }
     .ad-danger:hover { background:#3a1a1a; }
-    .card { background:#161412; border:1px solid #2A2622; border-radius:1rem; }
+    .card { background:#151B2B; border:1px solid #28324A; border-radius:1rem; }
   </style>
 </head>
 <body class="min-h-screen">
@@ -42,9 +42,9 @@ export function AdminLogin(opts: { error?: string } = {}) {
   <main class="min-h-screen flex items-center justify-center px-5">
     <div class="card p-10 w-full max-w-sm">
       <div class="text-center mb-8">
-        <i class="fas fa-fire-flame-curved text-3xl" style="color:#FB7234"></i>
+        <i class="fas fa-fire-flame-curved text-3xl" style="color:#818CF8"></i>
         <h1 class="text-2xl mt-3">${SITE.name} Admin</h1>
-        <p class="text-sm text-[#9A8E82] mt-1">Restricted area — sign in to continue</p>
+        <p class="text-sm text-[#9BA8C0] mt-1">Restricted area — sign in to continue</p>
       </div>
       <form method="post" action="/admin/login" class="space-y-5">
         <div>
@@ -53,21 +53,21 @@ export function AdminLogin(opts: { error?: string } = {}) {
         </div>
         <button type="submit" class="ad-primary ad-btn w-full justify-center">Sign in <i class="fas fa-arrow-right text-xs"></i></button>
       </form>
-      <a href="/" class="block text-center text-xs text-[#9A8E82] hover:text-[#FB7234] mt-6">← Back to site</a>
+      <a href="/" class="block text-center text-xs text-[#9BA8C0] hover:text-[#818CF8] mt-6">← Back to site</a>
     </div>
   </main>`
   return shell('Sign in', body, { error: opts.error })
 }
 
 function topbar(active: string): string {
-  return `<header class="border-b border-[#2A2622] sticky top-0 bg-[#0F0E0D]/90 backdrop-blur z-10">
+  return `<header class="border-b border-[#28324A] sticky top-0 bg-[#0D111C]/90 backdrop-blur z-10">
     <div class="max-w-5xl mx-auto px-5 h-16 flex items-center justify-between">
-      <a href="/admin" class="flex items-center gap-2.5"><i class="fas fa-fire-flame-curved" style="color:#FB7234"></i><span class="font-semibold">${SITE.name} Admin</span></a>
+      <a href="/admin" class="flex items-center gap-2.5"><i class="fas fa-fire-flame-curved" style="color:#818CF8"></i><span class="font-semibold">${SITE.name} Admin</span></a>
       <nav class="flex items-center gap-5 text-sm">
-        <a href="/admin" class="${active === 'dash' ? 'text-[#FB7234]' : 'text-[#C9BFB5] hover:text-white'}">Posts</a>
-        <a href="/admin/new" class="${active === 'new' ? 'text-[#FB7234]' : 'text-[#C9BFB5] hover:text-white'}">New post</a>
-        <a href="/" target="_blank" class="text-[#C9BFB5] hover:text-white">View site <i class="fas fa-arrow-up-right-from-square text-[0.6rem]"></i></a>
-        <form method="post" action="/admin/logout" class="inline"><button class="text-[#9A8E82] hover:text-red-300">Log out</button></form>
+        <a href="/admin" class="${active === 'dash' ? 'text-[#818CF8]' : 'text-[#CBD5E6] hover:text-white'}">Posts</a>
+        <a href="/admin/new" class="${active === 'new' ? 'text-[#818CF8]' : 'text-[#CBD5E6] hover:text-white'}">New post</a>
+        <a href="/" target="_blank" class="text-[#CBD5E6] hover:text-white">View site <i class="fas fa-arrow-up-right-from-square text-[0.6rem]"></i></a>
+        <form method="post" action="/admin/logout" class="inline"><button class="text-[#9BA8C0] hover:text-red-300">Log out</button></form>
       </nav>
     </div>
   </header>`
@@ -84,7 +84,7 @@ export function AdminDashboard(data: { posts: Post[]; flash?: string }) {
       <div class="flex items-center justify-between">
         <div>
           <div class="text-3xl font-semibold" style="font-family:'Playfair Display',serif">${value}</div>
-          <div class="text-xs text-[#9A8E82] uppercase tracking-wider mt-1">${label}</div>
+          <div class="text-xs text-[#9BA8C0] uppercase tracking-wider mt-1">${label}</div>
         </div>
         <i class="${icon} text-xl" style="color:${color}"></i>
       </div>
@@ -92,16 +92,16 @@ export function AdminDashboard(data: { posts: Post[]; flash?: string }) {
 
   const rows = data.posts
     .map(
-      (p) => `<tr class="post-row border-t border-[#2A2622] hover:bg-[#1A1816] transition"
+      (p) => `<tr class="post-row border-t border-[#28324A] hover:bg-[#101624] transition"
         data-status="${p.published ? 'published' : 'draft'}"
         data-title="${escapeAttr(p.title.toLowerCase())}"
         data-slug="${escapeAttr(p.slug.toLowerCase())}">
       <td class="py-3.5 px-5">
-        <div class="font-medium text-[#F2EDE7] break-words">${escapeHtml(p.title)}</div>
-        <a href="/blog/${p.slug}" target="_blank" class="text-xs text-[#9A8E82] hover:text-[#FB7234] break-all">/blog/${p.slug} <i class="fas fa-arrow-up-right-from-square text-[0.55rem]"></i></a>
+        <div class="font-medium text-[#EDF2FA] break-words">${escapeHtml(p.title)}</div>
+        <a href="/blog/${p.slug}" target="_blank" class="text-xs text-[#9BA8C0] hover:text-[#818CF8] break-all">/blog/${p.slug} <i class="fas fa-arrow-up-right-from-square text-[0.55rem]"></i></a>
       </td>
-      <td class="py-3.5 pr-3 text-sm text-[#C9BFB5] whitespace-nowrap">${p.category_name || '—'}</td>
-      <td class="py-3.5 pr-3 text-sm whitespace-nowrap">${p.pillar ? '<span class="text-[#FB7234]">Guide</span>' : `<span class="text-[#9A8E82] capitalize">${p.post_type}</span>`}</td>
+      <td class="py-3.5 pr-3 text-sm text-[#CBD5E6] whitespace-nowrap">${p.category_name || '—'}</td>
+      <td class="py-3.5 pr-3 text-sm whitespace-nowrap">${p.pillar ? '<span class="text-[#818CF8]">Guide</span>' : `<span class="text-[#9BA8C0] capitalize">${p.post_type}</span>`}</td>
       <td class="py-3.5 pr-3 whitespace-nowrap">
         <form method="post" action="/admin/toggle/${p.id}" class="inline">
           <button title="Click to ${p.published ? 'unpublish' : 'publish'}" class="text-xs cursor-pointer hover:underline ${p.published ? 'text-emerald-400' : 'text-amber-400'}">${p.published ? '● Published' : '○ Draft'}</button>
@@ -123,7 +123,7 @@ export function AdminDashboard(data: { posts: Post[]; flash?: string }) {
     <div class="flex flex-wrap items-center justify-between gap-4 mb-8">
       <div>
         <h1 class="text-3xl">Dashboard</h1>
-        <p class="text-[#9A8E82] text-sm mt-1">Manage your blog posts, drafts &amp; SEO</p>
+        <p class="text-[#9BA8C0] text-sm mt-1">Manage your blog posts, drafts &amp; SEO</p>
       </div>
       <a href="/admin/new" class="ad-primary ad-btn"><i class="fas fa-plus"></i> New post</a>
     </div>
@@ -132,34 +132,34 @@ export function AdminDashboard(data: { posts: Post[]; flash?: string }) {
       ${statCard('Total posts', total, 'fas fa-newspaper', '#8ab4f8')}
       ${statCard('Published', published, 'fas fa-circle-check', '#34d399')}
       ${statCard('Drafts', drafts, 'fas fa-pen-ruler', '#fbbf24')}
-      ${statCard('Guides', guides, 'fas fa-compass', '#FB7234')}
+      ${statCard('Guides', guides, 'fas fa-compass', '#818CF8')}
     </div>
 
     <div class="card overflow-hidden">
-      <div class="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-[#2A2622]">
+      <div class="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-[#28324A]">
         <div class="flex items-center gap-1.5 text-sm" id="status-tabs">
           <button data-filter="all" class="filter-tab active px-3 py-1.5 rounded-md">All <span class="opacity-60">${total}</span></button>
           <button data-filter="published" class="filter-tab px-3 py-1.5 rounded-md">Published <span class="opacity-60">${published}</span></button>
           <button data-filter="draft" class="filter-tab px-3 py-1.5 rounded-md">Drafts <span class="opacity-60">${drafts}</span></button>
         </div>
         <div class="relative">
-          <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-xs text-[#6b635a]"></i>
+          <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-xs text-[#7A87A0]"></i>
           <input id="post-search" type="text" placeholder="Search posts…" class="ad-input !py-2 !pl-9 !w-56 text-sm" />
         </div>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
-          <thead><tr class="text-left text-[#9A8E82] text-xs uppercase tracking-wider"><th class="py-3 px-5">Title</th><th>Category</th><th>Type</th><th>Status</th><th class="px-5 text-right">Actions</th></tr></thead>
-          <tbody id="posts-tbody">${rows || '<tr><td colspan="5" class="py-12 text-center text-[#9A8E82]">No posts yet. <a href="/admin/new" class="text-[#FB7234] underline">Create your first post →</a></td></tr>'}</tbody>
+          <thead><tr class="text-left text-[#9BA8C0] text-xs uppercase tracking-wider"><th class="py-3 px-5">Title</th><th>Category</th><th>Type</th><th>Status</th><th class="px-5 text-right">Actions</th></tr></thead>
+          <tbody id="posts-tbody">${rows || '<tr><td colspan="5" class="py-12 text-center text-[#9BA8C0]">No posts yet. <a href="/admin/new" class="text-[#818CF8] underline">Create your first post →</a></td></tr>'}</tbody>
         </table>
-        <div id="no-results" class="hidden py-12 text-center text-[#9A8E82]">No posts match your filter.</div>
+        <div id="no-results" class="hidden py-12 text-center text-[#9BA8C0]">No posts match your filter.</div>
       </div>
     </div>
   </main>
   <style>
-    .filter-tab { color:#9A8E82; transition:all .2s; }
-    .filter-tab:hover { color:#E7E2DC; }
-    .filter-tab.active { background:#2A2622; color:#FB7234; }
+    .filter-tab { color:#9BA8C0; transition:all .2s; }
+    .filter-tab:hover { color:#EDF2FA; }
+    .filter-tab.active { background:#28324A; color:#818CF8; }
   </style>
   <script>
   (function(){
@@ -205,7 +205,7 @@ export function AdminEditor(data: { post?: Post; categories: Category[]; error?:
   <main class="max-w-3xl mx-auto px-5 py-10">
     <div class="flex items-center justify-between mb-8">
       <h1 class="text-3xl">${isEdit ? 'Edit post' : 'New post'}</h1>
-      <a href="/admin" class="text-sm text-[#9A8E82] hover:text-white">← All posts</a>
+      <a href="/admin" class="text-sm text-[#9BA8C0] hover:text-white">← All posts</a>
     </div>
     <form method="post" action="${isEdit ? `/admin/edit/${p!.id}` : '/admin/new'}" class="space-y-6">
       <div>
@@ -214,7 +214,7 @@ export function AdminEditor(data: { post?: Post; categories: Category[]; error?:
       </div>
       <div class="grid sm:grid-cols-2 gap-4">
         <div>
-          <label class="ad-label">Slug * <span class="text-[#6b635a] normal-case">(/blog/…)</span></label>
+          <label class="ad-label">Slug * <span class="text-[#7A87A0] normal-case">(/blog/…)</span></label>
           <input name="slug" required class="ad-input" value="${p ? escapeAttr(p.slug) : ''}" placeholder="best-wireless-earbuds" />
         </div>
         <div>
@@ -223,17 +223,17 @@ export function AdminEditor(data: { post?: Post; categories: Category[]; error?:
         </div>
       </div>
       <div>
-        <label class="ad-label">Dek <span class="text-[#6b635a] normal-case">(italic standfirst under the title)</span></label>
+        <label class="ad-label">Dek <span class="text-[#7A87A0] normal-case">(italic standfirst under the title)</span></label>
         <input name="dek" class="ad-input" value="${p ? escapeAttr(p.dek || '') : ''}" />
       </div>
       <div>
-        <label class="ad-label">Excerpt <span class="text-[#6b635a] normal-case">(meta description / card preview)</span></label>
+        <label class="ad-label">Excerpt <span class="text-[#7A87A0] normal-case">(meta description / card preview)</span></label>
         <textarea name="excerpt" rows="2" class="ad-input">${p ? escapeHtml(p.excerpt || '') : ''}</textarea>
       </div>
       <div>
         <label class="ad-label">Body (Markdown) *</label>
         <textarea name="body" rows="18" required class="ad-input font-mono text-sm leading-relaxed" placeholder="## The short answer&#10;Write your review in Markdown…">${p ? escapeHtml(p.body) : ''}</textarea>
-        <p class="text-xs text-[#6b635a] mt-1.5">Supports Markdown: ## headings, **bold**, lists, [links](url), &gt; quotes, tables.</p>
+        <p class="text-xs text-[#7A87A0] mt-1.5">Supports Markdown: ## headings, **bold**, lists, [links](url), &gt; quotes, tables.</p>
       </div>
       <div class="grid sm:grid-cols-3 gap-4">
         <div>
@@ -260,21 +260,21 @@ export function AdminEditor(data: { post?: Post; categories: Category[]; error?:
         </div>
       </div>
       <div class="flex items-center gap-6 pt-2">
-        <label class="flex items-center gap-2.5 cursor-pointer text-sm"><input type="checkbox" name="published" value="1" ${!p || p.published ? 'checked' : ''} style="width:1.1rem;height:1.1rem;accent-color:#FB7234" /> Published</label>
-        <label class="flex items-center gap-2.5 cursor-pointer text-sm"><input type="checkbox" name="pillar" value="1" ${p && p.pillar ? 'checked' : ''} style="width:1.1rem;height:1.1rem;accent-color:#FB7234" /> Buying guide (pillar)</label>
+        <label class="flex items-center gap-2.5 cursor-pointer text-sm"><input type="checkbox" name="published" value="1" ${!p || p.published ? 'checked' : ''} style="width:1.1rem;height:1.1rem;accent-color:#818CF8" /> Published</label>
+        <label class="flex items-center gap-2.5 cursor-pointer text-sm"><input type="checkbox" name="pillar" value="1" ${p && p.pillar ? 'checked' : ''} style="width:1.1rem;height:1.1rem;accent-color:#818CF8" /> Buying guide (pillar)</label>
       </div>
 
       <!-- ============ SEO PANEL ============ -->
       <section class="card p-6 mt-2">
         <div class="flex items-center gap-2.5 mb-1">
-          <i class="fas fa-magnifying-glass-chart" style="color:#FB7234"></i>
+          <i class="fas fa-magnifying-glass-chart" style="color:#818CF8"></i>
           <h2 class="text-xl">Search &amp; Social (SEO)</h2>
         </div>
-        <p class="text-xs text-[#9A8E82] mb-6">Control exactly how this post appears on Google and when shared. Leave blank to fall back to the title &amp; excerpt.</p>
+        <p class="text-xs text-[#9BA8C0] mb-6">Control exactly how this post appears on Google and when shared. Leave blank to fall back to the title &amp; excerpt.</p>
 
         <!-- Live Google preview -->
-        <div class="rounded-lg p-4 mb-6" style="background:#1A1816;border:1px solid #2A2622">
-          <div class="text-[0.7rem] text-[#6b635a] uppercase tracking-wider mb-2">Google preview</div>
+        <div class="rounded-lg p-4 mb-6" style="background:#101624;border:1px solid #28324A">
+          <div class="text-[0.7rem] text-[#7A87A0] uppercase tracking-wider mb-2">Google preview</div>
           <div id="seo-prev-url" style="color:#9aa0a6;font-size:.8rem">${SITE.url}/blog/${p ? escapeHtml(p.slug) : 'your-post'}</div>
           <div id="seo-prev-title" style="color:#8ab4f8;font-size:1.05rem;line-height:1.3;margin:.15rem 0">${escapeHtml((p && (p.meta_title || p.title)) || 'Your post title')}</div>
           <div id="seo-prev-desc" style="color:#bdc1c6;font-size:.82rem;line-height:1.45">${escapeHtml((p && (p.meta_description || p.excerpt)) || 'Your meta description will appear here. Aim for 150–160 characters that summarise the post and entice the click.')}</div>
@@ -284,20 +284,20 @@ export function AdminEditor(data: { post?: Post; categories: Category[]; error?:
           <div>
             <div class="flex items-center justify-between">
               <label class="ad-label !mb-0">Meta title</label>
-              <span id="mt-count" class="text-[0.68rem] text-[#6b635a]">0 / 60</span>
+              <span id="mt-count" class="text-[0.68rem] text-[#7A87A0]">0 / 60</span>
             </div>
             <input id="seo-meta-title" name="meta_title" maxlength="70" class="ad-input mt-1.5" value="${p ? escapeAttr(p.meta_title || '') : ''}" placeholder="Defaults to the post title" />
           </div>
           <div>
             <div class="flex items-center justify-between">
               <label class="ad-label !mb-0">Meta description</label>
-              <span id="md-count" class="text-[0.68rem] text-[#6b635a]">0 / 160</span>
+              <span id="md-count" class="text-[0.68rem] text-[#7A87A0]">0 / 160</span>
             </div>
             <textarea id="seo-meta-desc" name="meta_description" rows="2" maxlength="200" class="ad-input mt-1.5" placeholder="Defaults to the excerpt">${p ? escapeHtml(p.meta_description || '') : ''}</textarea>
           </div>
           <div class="grid sm:grid-cols-2 gap-4">
             <div>
-              <label class="ad-label">Focus keywords <span class="text-[#6b635a] normal-case">(comma separated)</span></label>
+              <label class="ad-label">Focus keywords <span class="text-[#7A87A0] normal-case">(comma separated)</span></label>
               <input name="meta_keywords" class="ad-input" value="${p ? escapeAttr(p.meta_keywords || '') : ''}" placeholder="wireless earbuds, budget, review" />
             </div>
             <div>
@@ -307,15 +307,15 @@ export function AdminEditor(data: { post?: Post; categories: Category[]; error?:
           </div>
           <div class="grid sm:grid-cols-2 gap-4 items-end">
             <div>
-              <label class="ad-label">Canonical URL <span class="text-[#6b635a] normal-case">(optional)</span></label>
+              <label class="ad-label">Canonical URL <span class="text-[#7A87A0] normal-case">(optional)</span></label>
               <input name="canonical_url" class="ad-input" value="${p ? escapeAttr(p.canonical_url || '') : ''}" placeholder="Leave blank for default" />
             </div>
-            <label class="flex items-center gap-2.5 cursor-pointer text-sm pb-1.5"><input type="checkbox" name="noindex" value="1" ${p && p.noindex ? 'checked' : ''} style="width:1.1rem;height:1.1rem;accent-color:#FB7234" /> Hide from search engines (noindex)</label>
+            <label class="flex items-center gap-2.5 cursor-pointer text-sm pb-1.5"><input type="checkbox" name="noindex" value="1" ${p && p.noindex ? 'checked' : ''} style="width:1.1rem;height:1.1rem;accent-color:#818CF8" /> Hide from search engines (noindex)</label>
           </div>
         </div>
       </section>
 
-      <div class="flex items-center gap-3 pt-4 border-t border-[#2A2622]">
+      <div class="flex items-center gap-3 pt-4 border-t border-[#28324A]">
         <button type="submit" class="ad-primary ad-btn"><i class="fas fa-floppy-disk"></i> ${isEdit ? 'Save changes' : 'Create post'}</button>
         <a href="/admin" class="ad-btn ad-line">Cancel</a>
       </div>
@@ -333,7 +333,7 @@ export function AdminEditor(data: { post?: Post; categories: Category[]; error?:
     var pvUrl=document.getElementById('seo-prev-url');
     var mtCount=document.getElementById('mt-count');
     var mdCount=document.getElementById('md-count');
-    function count(el,out,max){ if(!el||!out)return; var n=(el.value||'').length; out.textContent=n+' / '+max; out.style.color=n>max?'#F87171':(n>max*0.92?'#FBBF24':'#6b635a'); }
+    function count(el,out,max){ if(!el||!out)return; var n=(el.value||'').length; out.textContent=n+' / '+max; out.style.color=n>max?'#F87171':(n>max*0.92?'#FBBF24':'#7A87A0'); }
     function refresh(){
       var t=(mt&&mt.value)|| (title&&title.value) || 'Your post title';
       var d=(md&&md.value)|| (excerpt&&excerpt.value) || 'Your meta description will appear here.';

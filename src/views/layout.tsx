@@ -73,11 +73,29 @@ export function Layout(opts: LayoutOpts) {
       theme: {
         extend: {
           colors: {
-            bg: 'var(--bg)', surface: 'var(--surface)', panel: 'var(--surface-2)',
-            ink: { DEFAULT: 'var(--ink)', soft: 'var(--ink-soft)', mute: 'var(--ink-mute)', faint: 'var(--ink-faint)' },
-            accent: { DEFAULT: 'var(--accent)', deep: 'var(--accent-deep)', tint: 'var(--accent-tint)', ink: 'var(--accent-ink)' },
-            line: { DEFAULT: 'var(--line)', soft: 'var(--line-soft)', strong: 'var(--line-strong)' },
-            star: 'var(--star)',
+            // RGB-channel format ('r g b') so opacity modifiers like text-bg/80,
+            // bg-surface/90, text-accent/30 work AND still follow [data-theme].
+            bg: 'rgb(var(--bg-c) / <alpha-value>)',
+            surface: 'rgb(var(--surface-c) / <alpha-value>)',
+            panel: 'rgb(var(--surface-2-c) / <alpha-value>)',
+            ink: {
+              DEFAULT: 'rgb(var(--ink-c) / <alpha-value>)',
+              soft: 'rgb(var(--ink-soft-c) / <alpha-value>)',
+              mute: 'rgb(var(--ink-mute-c) / <alpha-value>)',
+              faint: 'rgb(var(--ink-faint-c) / <alpha-value>)',
+            },
+            accent: {
+              DEFAULT: 'rgb(var(--accent-c) / <alpha-value>)',
+              deep: 'rgb(var(--accent-deep-c) / <alpha-value>)',
+              tint: 'rgb(var(--accent-tint-c) / <alpha-value>)',
+              ink: 'rgb(var(--accent-ink-c) / <alpha-value>)',
+            },
+            line: {
+              DEFAULT: 'rgb(var(--line-c) / <alpha-value>)',
+              soft: 'rgb(var(--line-soft-c) / <alpha-value>)',
+              strong: 'rgb(var(--line-strong-c) / <alpha-value>)',
+            },
+            star: 'rgb(var(--star-c) / <alpha-value>)',
           },
           fontFamily: {
             serif: ['Playfair Display', 'Georgia', 'serif'],
@@ -114,9 +132,9 @@ function ThemeToggle(): string {
 
 function TopBar(): string {
   return `
-  <div class="bg-ink text-bg/80 text-[0.72rem] tracking-[0.14em] uppercase font-medium">
-    <div class="max-w-editorial mx-auto px-5 h-9 flex items-center justify-center gap-2">
-      <i class="fas fa-vial-circle-check text-accent-tint"></i>
+  <div class="topbar text-[0.72rem] tracking-[0.14em] uppercase font-medium">
+    <div class="topbar__inner max-w-editorial mx-auto px-5 h-9 flex items-center justify-center gap-2">
+      <i class="fas fa-vial-circle-check"></i>
       <span>Independent &amp; reader-supported — we test before we recommend</span>
     </div>
   </div>`
