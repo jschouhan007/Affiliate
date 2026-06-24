@@ -66,10 +66,16 @@ generic template.
 - **Interactive Comparison Matrix** — "Compare" toggle on every product card → sticky compare
   tray (max 4, `localStorage`) → `/compare?ids=` matrix comparing price, rating, brand, award,
   specs and features, with lowest-price & top-rated highlights.
-- **Smart dark/light theme** — animated flame toggle, modern **indigo + teal + coral**
-  palette (cool slate neutrals) in both light and dark modes, brand-gradient announcement
-  bar, no-flash inline script, `prefers-color-scheme` fallback, localStorage memory.
-  Theme tokens use RGB-channel CSS variables so Tailwind opacity modifiers work everywhere.
+- **Smart dark/light theme** — animated flame toggle, no-flash inline script,
+  `prefers-color-scheme` fallback, localStorage memory. Theme tokens use RGB-channel
+  CSS variables so Tailwind opacity modifiers work everywhere.
+  - **Light mode**: warm vintage **"paper"** look (cream/ivory + deep wine/bordeaux
+    accent + antique gold) with a hand-built, pure-CSS crumpled-paper texture
+    (SVG fractal-noise grain + sepia crease blotches + vignette) for a classic,
+    retro, luxury-fashion editorial feel.
+  - **Dark mode**: deep navy slate with bright cyan/violet accents (clean, no texture).
+- **Animated announcement bar** — colourful gradient strip with the trust message
+  scrolling as a seamless right→left marquee (pauses on hover, respects reduced-motion).
 - **Performance** — strict image `width`/`height` (zero CLS), lazy images, skeleton loaders, and
   heavy matrices lazy-revealed on scroll via `IntersectionObserver`. Respects `prefers-reduced-motion`.
 - **Rich product blog** — 10 in-depth posts (long-term reviews, head-to-heads, setup & buying
@@ -200,4 +206,4 @@ npm run db:reset
 - Cloudflare Pages + Workers runtime · Cloudflare D1 (SQLite)
 - Tailwind CSS (CDN) · Font Awesome (CDN)
 
-**Last Updated**: 2026-06-24 (indigo/teal/coral theme + top-bar visibility fix)
+**Last Updated**: 2026-06-24 (vintage paper light theme + seamless marquee + 4-item nav)
