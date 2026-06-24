@@ -30,8 +30,8 @@ function shell(title: string, body: string, opts: { flash?: string; error?: stri
   </style>
 </head>
 <body class="min-h-screen">
-  ${raw(opts.flash ? `<div class="bg-emerald-900/40 border-b border-emerald-700/40 text-emerald-200 text-sm px-5 py-3 text-center">${opts.flash}</div>` : '')}
-  ${raw(opts.error ? `<div class="bg-red-900/40 border-b border-red-700/40 text-red-200 text-sm px-5 py-3 text-center">${opts.error}</div>` : '')}
+  ${raw(opts.flash ? `<div class="bg-emerald-900/40 border-b border-emerald-700/40 text-emerald-200 text-sm px-5 py-3 text-center">${escapeHtml(opts.flash)}</div>` : '')}
+  ${raw(opts.error ? `<div class="bg-red-900/40 border-b border-red-700/40 text-red-200 text-sm px-5 py-3 text-center">${escapeHtml(opts.error)}</div>` : '')}
   ${raw(body)}
 </body>
 </html>`

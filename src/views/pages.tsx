@@ -504,11 +504,13 @@ export function PostPage(data: {
 export function SearchPage(data: { q: string; deals: Deal[]; posts: Post[] }): string {
   const { q, deals, posts } = data
   const total = deals.length + posts.length
+  // escape user-supplied query before reflecting it into HTML (prevents XSS)
+  const safeQ = String(q).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string))
   return `<div class="max-w-editorial mx-auto px-5 py-16">
     ${Breadcrumbs([{ name: 'Home', url: '/' }, { name: 'Search' }])}
     <header class="mb-14">
       <div class="eyebrow mb-3">Search</div>
-      <h1 class="font-serif text-4xl text-ink">Results for "${q}"</h1>
+      <h1 class="font-serif text-4xl text-ink break-words">Results for "${safeQ}"</h1>
       <p class="mt-3 text-ink-mute">${total} result${total === 1 ? '' : 's'} found.</p>
     </header>
     ${deals.length ? `<section class="mb-20">${SectionHeader('Products', 'Reviews')}${DealGrid(deals)}</section>` : ''}
