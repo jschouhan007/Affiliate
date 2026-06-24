@@ -10,7 +10,7 @@
     root.setAttribute('data-theme', t);
     try { localStorage.setItem('theme', t); } catch (e) {}
     if (toggle) toggle.setAttribute('aria-checked', t === 'dark' ? 'true' : 'false');
-    if (themeMeta) themeMeta.setAttribute('content', t === 'dark' ? '#14100E' : '#FCFBF9');
+    if (themeMeta) themeMeta.setAttribute('content', t === 'dark' ? '#14100E' : '#F2ECDE');
   }
   // sync meta to whatever the no-flash script already set
   applyTheme(root.getAttribute('data-theme') || 'light');

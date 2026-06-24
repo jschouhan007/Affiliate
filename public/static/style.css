@@ -14,28 +14,33 @@
    *-c vars hold raw RGB channels (for Tailwind opacity modifiers).
    The plain names resolve to rgb(...) so all CSS below works unchanged. */
 :root, [data-theme="light"] {
-  --bg-c:        239 242 249;   /* soft cool lavender-grey — not stark white */
-  --surface-c:   255 255 255;   /* cards stay crisp white so they lift off the bg */
-  --surface-2-c: 232 236 245;   /* slightly deeper panel tint */
+  /* ===== Light theme = warm vintage "paper" — cream/ivory, editorial,
+     luxury-fashion feel. The crumpled-paper texture is layered on <body>
+     below (see .paper-bg). Cards are a cleaner ivory so they lift gently
+     off the textured page without looking like stark white boxes. ===== */
+  --bg-c:        242 236 222;   /* warm vanilla cream (paper base) */
+  --surface-c:   252 249 241;   /* soft ivory card — warmer than pure white */
+  --surface-2-c: 236 229 213;   /* deeper sand panel tint */
 
-  --ink-c:       15 23 42;      /* slate-900 */
-  --ink-soft-c:  44 56 82;      /* slate-700-ish, a touch deeper for contrast */
-  --ink-mute-c:  71 85 105;     /* slate-600 */
-  --ink-faint-c: 100 116 139;   /* slate-500 */
+  --ink-c:       38 31 24;      /* near-black warm espresso (not pure black) */
+  --ink-soft-c:  64 54 44;      /* warm dark brown-grey */
+  --ink-mute-c:  104 92 78;     /* muted taupe */
+  --ink-faint-c: 142 129 112;   /* soft stone */
 
-  --accent-c:        79 70 229;     /* indigo-600 */
-  --accent-deep-c:   67 56 202;     /* indigo-700 */
-  --accent-tint-c:   238 242 255;   /* indigo-50 */
-  --accent-ink-c:    55 48 163;     /* indigo-800 */
-  --accent-rgb:      79,70,229;
+  --accent-c:        159 47 57;     /* deep wine / bordeaux — couture accent */
+  --accent-deep-c:   122 32 42;     /* darker bordeaux */
+  --accent-tint-c:   244 232 224;   /* blush parchment */
+  --accent-ink-c:    104 28 36;     /* rich oxblood for text-on-tint */
+  --accent-rgb:      159,47,57;
 
-  --line-c:      219 225 236;   /* soft slate border, reads on tinted bg */
-  --line-soft-c: 230 234 243;
-  --line-strong-c: 198 206 222; /* clearer divider */
-  --star-c:      245 158 11;    /* amber-500 */
+  --line-c:      214 203 182;   /* aged-paper hairline */
+  --line-soft-c: 228 219 202;
+  --line-strong-c: 192 178 154; /* clearer sepia divider */
+  --star-c:      181 137 56;    /* antique gold (instead of bright amber) */
 
+  /* announcement bar keeps its colourful gradient site-wide */
   --flame: linear-gradient(135deg, #06B6D4 0%, #6366F1 50%, #F43F5E 100%);
-  --glow-rgb: 99,102,241;
+  --glow-rgb: 159,47,57;
   color-scheme: light;
 }
 
@@ -107,16 +112,24 @@ body, .card, .btn, header, footer, input {
   z-index: 1;
   width: 100%;
 }
-/* Scrolling marquee track: moves continuously right → left and loops.
-   The message is repeated 4× in markup; we translate by 25% so the loop
-   is seamless (the next copy lands exactly where the previous one was). */
+/* Seamless right → left marquee.
+   The track holds TWO identical groups laid side by side. Animating the track
+   from 0 to -50% scrolls exactly one group-width off the left; at that instant
+   the second group occupies the original position, so the loop repeats with no
+   jump or gap. translateX(-50%) here = half the track = one full group. */
 .topbar__track {
   display: flex;
   align-items: center;
-  white-space: nowrap;
   width: max-content;
+  flex-wrap: nowrap;
   will-change: transform;
-  animation: topbar-marquee 28s linear infinite;
+  animation: topbar-marquee 32s linear infinite;
+}
+.topbar__group {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .topbar__item {
   display: inline-flex;
@@ -125,11 +138,12 @@ body, .card, .btn, header, footer, input {
   color: #ffffff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
   padding: 0 2.5rem;   /* spacing between repeats */
+  white-space: nowrap;
 }
 .topbar__item i { color: rgba(255, 255, 255, 0.95); }
 @keyframes topbar-marquee {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-25%); }
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
 }
 /* Pause on hover so users can read it comfortably */
 .topbar:hover .topbar__track { animation-play-state: paused; }
@@ -151,8 +165,10 @@ body, .card, .btn, header, footer, input {
 }
 @media (prefers-reduced-motion: reduce) {
   .topbar::after { animation: none; }
-  /* Honour reduced-motion: stop scrolling and center the single message */
+  /* Honour reduced-motion: stop scrolling, show one centred message */
   .topbar__track { animation: none; justify-content: center; width: 100%; }
+  .topbar__group:not(:first-child) { display: none; }
+  .topbar__group { flex: 1 1 auto; justify-content: center; }
   .topbar__item:not(:first-child) { display: none; }
 }
 
@@ -194,6 +210,53 @@ body {
   font-feature-settings: "ss01", "cv01", "cv02";
   line-height: 1.7;
   letter-spacing: -0.003em;
+}
+
+/* ============================================================
+   LIGHT THEME — VINTAGE TEXTURED "PAPER" BACKGROUND
+   A hand-built, pure-CSS crumpled / handmade-paper texture for a
+   classic, retro, luxury-fashion editorial feel. Three stacked
+   layers on a fixed pseudo-element behind all content:
+     1. SVG fractal-noise grain (fine paper fibre)
+     2. soft sepia "crease" blotches (large radial gradients)
+     3. a gentle warm vignette toward the edges
+   Only renders in light mode — dark mode stays clean. Sits at
+   z-index:-1 so it never covers or hides any text/elements.
+   ============================================================ */
+[data-theme="light"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: rgb(var(--bg-c));
+  background-image:
+    /* (3) warm vignette — darker, richer toward corners */
+    radial-gradient(120% 130% at 50% 0%, rgba(255,250,240,0.55) 0%, rgba(255,250,240,0) 45%),
+    radial-gradient(140% 140% at 50% 120%, rgba(120,96,64,0.10) 0%, rgba(120,96,64,0) 55%),
+    /* (2) soft crease / blotch shading, irregular like real paper */
+    radial-gradient(40% 30% at 18% 22%, rgba(168,140,98,0.10) 0%, rgba(168,140,98,0) 70%),
+    radial-gradient(45% 35% at 82% 30%, rgba(150,120,80,0.09) 0%, rgba(150,120,80,0) 72%),
+    radial-gradient(50% 40% at 30% 78%, rgba(170,142,100,0.08) 0%, rgba(170,142,100,0) 70%),
+    radial-gradient(42% 32% at 72% 82%, rgba(150,120,80,0.085) 0%, rgba(150,120,80,0) 72%),
+    /* (1) fine fractal-noise paper fibre grain (SVG, scaled small) */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 240px 240px;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat;
+}
+/* slightly larger, softer secondary grain for an organic "fold" feel */
+[data-theme="light"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012 0.016' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)' opacity='0.06'/%3E%3C/svg%3E");
+  background-size: 600px 600px;
+  background-repeat: repeat;
 }
 
 /* ---- Typography ---- */

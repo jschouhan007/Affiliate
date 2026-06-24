@@ -43,7 +43,7 @@ export function Layout(opts: LayoutOpts) {
   ${keywords ? raw(`<meta name="keywords" content="${keywords.replace(/"/g, '&quot;')}" />`) : ''}
   <link rel="canonical" href="${canonUrl}" />
   ${noindex ? raw('<meta name="robots" content="noindex,follow" />') : raw('<meta name="robots" content="index,follow,max-image-preview:large" />')}
-  <meta name="theme-color" content="#FCFBF9" />
+  <meta name="theme-color" content="#F2ECDE" />
   <meta name="color-scheme" content="light dark" />
 
   <meta property="og:type" content="website" />
@@ -131,14 +131,18 @@ function ThemeToggle(): string {
 }
 
 function TopBar(): string {
-  // Scrolling marquee (right → left). The message is repeated so the strip
-  // never shows a gap, and the whole track loops seamlessly.
+  // Seamless right→left marquee. Built from TWO identical groups; the track
+  // animates from 0 → -50% so when the first group has fully scrolled off the
+  // left, the second group sits exactly where the first started — looping with
+  // no visible jump or gap. Each group repeats the message enough times to
+  // always span the widest screens.
   const msg = `<span class="topbar__item"><i class="fas fa-vial-circle-check"></i> Independent &amp; reader-supported — we test before we recommend</span>`
+  const group = `<div class="topbar__group" aria-hidden="false">${msg}${msg}${msg}</div>`
   return `
   <div class="topbar text-[0.72rem] tracking-[0.14em] uppercase font-medium" role="marquee" aria-label="Independent and reader-supported — we test before we recommend">
     <div class="topbar__inner h-9 flex items-center overflow-hidden">
       <div class="topbar__track">
-        ${msg}${msg}${msg}${msg}
+        ${group}${group}
       </div>
     </div>
   </div>`
