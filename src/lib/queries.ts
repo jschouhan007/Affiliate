@@ -23,7 +23,7 @@ export async function getOffersForDeal(
 ): Promise<Offer[]> {
   const { results } = await db
     .prepare(
-      `SELECT o.*, al.slug AS affiliate_slug, al.label
+      `SELECT o.*, al.slug AS affiliate_slug, al.label, al.dest_url
        FROM offers o
        LEFT JOIN affiliate_links al ON al.id = o.affiliate_link_id
        WHERE o.deal_id = ?
@@ -61,6 +61,22 @@ export async function getDeals(
     }
   }
   const { results } = await db.prepare(sql).bind(...binds).all<Deal>()
+  const deals = results || []
+  for (const d of deals) d.offers = await getOffersForDeal(db, d.id)
+  return deals
+}
+
+// Full published catalogue for the homepage product grid. Fashion-first
+// (this is a fashion-prioritised niche), then featured, then newest. Capped at
+// a sane number so the client-side paginated grid stays fast.
+export async function getCatalogueDeals(db: D1Database, limit = 180): Promise<Deal[]> {
+  const sql =
+    DEAL_SELECT +
+    ` WHERE d.published = 1
+      ORDER BY (CASE WHEN c.slug = 'fashion' THEN 0 ELSE 1 END) ASC,
+               d.featured DESC, d.updated_at DESC
+      LIMIT ?`
+  const { results } = await db.prepare(sql).bind(limit).all<Deal>()
   const deals = results || []
   for (const d of deals) d.offers = await getOffersForDeal(db, d.id)
   return deals
@@ -225,9 +241,9 @@ export async function getHubDeals(db: D1Database, hub: Hub): Promise<Deal[]> {
   return deals
 }
 
-export async function getDealsByIds(db: D1Database, ids: number[]): Promise<Deal[]> {
+export async function getDealsByIds(db: D1Database, ids: number[], max = 4): Promise<Deal[]> {
   if (!ids.length) return []
-  const safe = ids.filter((n) => Number.isInteger(n)).slice(0, 4)
+  const safe = ids.filter((n) => Number.isInteger(n)).slice(0, max)
   if (!safe.length) return []
   const placeholders = safe.map(() => '?').join(',')
   const { results } = await db
@@ -238,6 +254,243 @@ export async function getDealsByIds(db: D1Database, ids: number[]): Promise<Deal
   for (const d of deals) d.offers = await getOffersForDeal(db, d.id)
   // preserve requested order
   return safe.map((id) => deals.find((d) => d.id === id)).filter(Boolean) as Deal[]
+}
+
+// ---- Site settings (key/value) ----
+export async function getSetting(db: D1Database, key: string): Promise<string | null> {
+  const row = await db.prepare('SELECT value FROM site_settings WHERE key = ?').bind(key).first<{ value: string }>()
+  return row ? row.value : null
+}
+
+export async function setSetting(db: D1Database, key: string, value: string): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO site_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`
+    )
+    .bind(key, value)
+    .run()
+}
+
+// Ordered list of product IDs chosen for the homepage hero carousel.
+export async function getCarouselIds(db: D1Database): Promise<number[]> {
+  const raw = await getSetting(db, 'hero_carousel')
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr.filter((n) => Number.isInteger(n)).slice(0, 8) : []
+  } catch {
+    return []
+  }
+}
+
+export async function setCarouselIds(db: D1Database, ids: number[]): Promise<void> {
+  const clean = ids.filter((n) => Number.isInteger(n)).slice(0, 8)
+  await setSetting(db, 'hero_carousel', JSON.stringify(clean))
+}
+
+// Resolve the carousel products. Falls back to featured (then latest) deals
+// so the hero is never empty even before the admin has made a selection.
+export async function getCarouselDeals(db: D1Database): Promise<Deal[]> {
+  const ids = await getCarouselIds(db)
+  let deals = ids.length ? await getDealsByIds(db, ids, 8) : []
+  if (deals.length < 8) {
+    const have = new Set(deals.map((d) => d.id))
+    const fillers = await getDeals(db, { featured: true, limit: 8 })
+    for (const d of fillers) {
+      if (deals.length >= 8) break
+      if (!have.has(d.id)) { deals.push(d); have.add(d.id) }
+    }
+    if (deals.length < 8) {
+      const more = await getDeals(db, { limit: 12 })
+      for (const d of more) {
+        if (deals.length >= 8) break
+        if (!have.has(d.id)) { deals.push(d); have.add(d.id) }
+      }
+    }
+  }
+  return deals.slice(0, 8)
+}
+
+// Admin: every product (published or draft), for the manager + carousel picker.
+export async function getAllDealsAdmin(db: D1Database): Promise<Deal[]> {
+  const { results } = await db
+    .prepare(DEAL_SELECT + ' ORDER BY d.featured DESC, d.updated_at DESC, d.title ASC')
+    .all<Deal>()
+  const deals = results || []
+  for (const d of deals) d.offers = await getOffersForDeal(db, d.id)
+  return deals
+}
+
+// ---- Admin: product (Deal) + offer CRUD ----
+export interface DealInput {
+  slug: string
+  title: string
+  brand?: string
+  category_id?: number | null
+  image_url?: string
+  short_desc?: string
+  description?: string
+  rating?: number | null
+  rating_count?: number
+  pros?: string
+  cons?: string
+  featured?: number
+  published?: number
+}
+
+export interface OfferInput {
+  retailer: string
+  price?: number | null
+  original_price?: number | null
+  currency?: string
+  in_stock?: number
+  buy_url?: string // the real product/affiliate destination URL
+  label?: string
+}
+
+export async function getDealById(db: D1Database, id: number): Promise<Deal | null> {
+  const deal = await db.prepare(DEAL_SELECT + ' WHERE d.id = ?').bind(id).first<Deal>()
+  if (deal) deal.offers = await getOffersForDeal(db, deal.id)
+  return deal
+}
+
+export async function dealSlugExists(db: D1Database, slug: string, exceptId?: number): Promise<boolean> {
+  const row = exceptId
+    ? await db.prepare('SELECT id FROM deals WHERE slug = ? AND id != ?').bind(slug, exceptId).first<{ id: number }>()
+    : await db.prepare('SELECT id FROM deals WHERE slug = ?').bind(slug).first<{ id: number }>()
+  return !!row
+}
+
+export async function createDeal(db: D1Database, d: DealInput): Promise<number> {
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  const res = await db
+    .prepare(
+      `INSERT INTO deals (slug, title, category_id, brand, image_url, short_desc, description, rating, rating_count, pros, cons, featured, published, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    )
+    .bind(
+      d.slug,
+      d.title,
+      d.category_id ?? null,
+      d.brand || null,
+      d.image_url || null,
+      d.short_desc || null,
+      d.description || null,
+      d.rating ?? null,
+      d.rating_count ?? 0,
+      d.pros || null,
+      d.cons || null,
+      d.featured ? 1 : 0,
+      d.published ? 1 : 0,
+      now,
+      now
+    )
+    .run()
+  return res.meta.last_row_id as number
+}
+
+export async function updateDeal(db: D1Database, id: number, d: DealInput): Promise<void> {
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  await db
+    .prepare(
+      `UPDATE deals SET slug=?, title=?, category_id=?, brand=?, image_url=?, short_desc=?, description=?, rating=?, rating_count=?, pros=?, cons=?, featured=?, published=?, updated_at=?
+       WHERE id=?`
+    )
+    .bind(
+      d.slug,
+      d.title,
+      d.category_id ?? null,
+      d.brand || null,
+      d.image_url || null,
+      d.short_desc || null,
+      d.description || null,
+      d.rating ?? null,
+      d.rating_count ?? 0,
+      d.pros || null,
+      d.cons || null,
+      d.featured ? 1 : 0,
+      d.published ? 1 : 0,
+      now,
+      id
+    )
+    .run()
+}
+
+export async function deleteDeal(db: D1Database, id: number): Promise<void> {
+  // Clean up related rows. Affiliate links tied only to this deal's offers are removed too.
+  const { results } = await db.prepare('SELECT affiliate_link_id FROM offers WHERE deal_id = ?').bind(id).all<{ affiliate_link_id: number | null }>()
+  await db.prepare('DELETE FROM offers WHERE deal_id = ?').bind(id).run()
+  await db.prepare('DELETE FROM post_deals WHERE deal_id = ?').bind(id).run()
+  await db.prepare('DELETE FROM hub_deals WHERE deal_id = ?').bind(id).run()
+  await db.prepare('DELETE FROM deals WHERE id = ?').bind(id).run()
+  for (const r of results || []) {
+    if (r.affiliate_link_id) {
+      const stillUsed = await db.prepare('SELECT id FROM offers WHERE affiliate_link_id = ? LIMIT 1').bind(r.affiliate_link_id).first()
+      if (!stillUsed) await db.prepare('DELETE FROM affiliate_links WHERE id = ?').bind(r.affiliate_link_id).run()
+    }
+  }
+}
+
+export async function setDealPublished(db: D1Database, id: number, published: number): Promise<void> {
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  await db.prepare('UPDATE deals SET published = ?, updated_at = ? WHERE id = ?').bind(published ? 1 : 0, now, id).run()
+}
+
+export async function setDealFeatured(db: D1Database, id: number, featured: number): Promise<void> {
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  await db.prepare('UPDATE deals SET featured = ?, updated_at = ? WHERE id = ?').bind(featured ? 1 : 0, now, id).run()
+}
+
+// Replace ALL offers for a deal with the supplied list. Each offer carries its
+// own buy URL, which we store as an affiliate_link (routed via /go/:slug) so the
+// Buy Now buttons keep working and clicks stay trackable.
+export async function replaceOffers(db: D1Database, dealId: number, dealSlug: string, offers: OfferInput[]): Promise<void> {
+  // Remove existing offers + their dedicated affiliate links
+  const { results: existing } = await db.prepare('SELECT affiliate_link_id FROM offers WHERE deal_id = ?').bind(dealId).all<{ affiliate_link_id: number | null }>()
+  await db.prepare('DELETE FROM offers WHERE deal_id = ?').bind(dealId).run()
+  for (const r of existing || []) {
+    if (r.affiliate_link_id) {
+      const stillUsed = await db.prepare('SELECT id FROM offers WHERE affiliate_link_id = ? LIMIT 1').bind(r.affiliate_link_id).first()
+      if (!stillUsed) await db.prepare('DELETE FROM affiliate_links WHERE id = ?').bind(r.affiliate_link_id).run()
+    }
+  }
+  let idx = 0
+  for (const o of offers) {
+    idx++
+    const retailer = (o.retailer || 'other').trim().toLowerCase()
+    if (!o.buy_url && o.price == null) continue // skip empty rows
+    let linkId: number | null = null
+    if (o.buy_url) {
+      // unique slug per offer
+      let base = `${dealSlug}-${retailer}`.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      let slug = base
+      let n = 2
+      while (await db.prepare('SELECT id FROM affiliate_links WHERE slug = ?').bind(slug).first()) {
+        slug = `${base}-${n++}`
+      }
+      const res = await db
+        .prepare('INSERT INTO affiliate_links (slug, retailer, dest_url, label, active) VALUES (?,?,?,?,1)')
+        .bind(slug, retailer, o.buy_url, o.label || `Buy on ${retailer}`)
+        .run()
+      linkId = res.meta.last_row_id as number
+    }
+    await db
+      .prepare(
+        `INSERT INTO offers (deal_id, retailer, affiliate_link_id, price, original_price, currency, in_stock, updated_at)
+         VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP)`
+      )
+      .bind(
+        dealId,
+        retailer,
+        linkId,
+        o.price ?? null,
+        o.original_price ?? null,
+        o.currency || 'INR',
+        o.in_stock ? 1 : 0
+      )
+      .run()
+  }
 }
 
 // ---- Admin: post CRUD ----

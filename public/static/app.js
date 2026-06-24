@@ -289,4 +289,261 @@
     }, { rootMargin: '200px' });
     blocks.forEach(function (b) { io.observe(b); });
   })();
+
+  // ---- Hero product carousel ----
+  (function () {
+    var root = document.getElementById('hero-carousel');
+    if (!root) return;
+    var track = document.getElementById('hero-track');
+    var slides = track ? track.querySelectorAll('.hero-slide') : [];
+    var dots = root.querySelectorAll('.hero-dot');
+    var prev = document.getElementById('hero-prev');
+    var next = document.getElementById('hero-next');
+    var count = slides.length;
+    if (!track || count === 0) return;
+
+    var index = 0;
+    var delay = parseInt(root.getAttribute('data-autoplay'), 10) || 6000;
+    var timer = null;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // expose autoplay duration to CSS so the active-dot fill bar matches it
+    root.style.setProperty('--hero-autoplay', delay + 'ms');
+
+    function go(n, fromUser) {
+      index = (n + count) % count;
+      track.style.transform = 'translateX(' + (-index * 100) + '%)';
+      for (var i = 0; i < dots.length; i++) {
+        dots[i].classList.toggle('is-active', i === index);
+      }
+      reflowActiveDot();
+      if (fromUser) restart();
+    }
+
+    function nextSlide() { go(index + 1); }
+    function prevSlide() { go(index - 1); }
+
+    function start() {
+      if (reduce || count < 2) return;
+      stop();
+      timer = setInterval(nextSlide, delay);
+    }
+    function stop() { if (timer) { clearInterval(timer); timer = null; } }
+    function restart() { stop(); start(); }
+
+    // Re-trigger the active-dot fill animation on each change by reflowing it
+    function reflowActiveDot() {
+      var a = root.querySelector('.hero-dot.is-active .hero-dot__fill');
+      if (!a) return;
+      a.style.animation = 'none';
+      // force reflow
+      void a.offsetWidth;
+      a.style.animation = '';
+    }
+
+    if (next) next.addEventListener('click', function () { nextSlide(); restart(); });
+    if (prev) prev.addEventListener('click', function () { prevSlide(); restart(); });
+    for (var d = 0; d < dots.length; d++) {
+      (function (i) {
+        dots[i].addEventListener('click', function () { go(i, true); });
+      })(d);
+    }
+
+    // Pause on hover / focus, resume on leave
+    root.addEventListener('mouseenter', function () { stop(); root.classList.add('is-paused'); });
+    root.addEventListener('mouseleave', function () { root.classList.remove('is-paused'); start(); });
+    root.addEventListener('focusin', function () { stop(); });
+    root.addEventListener('focusout', function () { start(); });
+
+    // Pause when tab not visible
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) stop(); else start();
+    });
+
+    // Touch / swipe support
+    var startX = 0, dx = 0, swiping = false;
+    track.addEventListener('touchstart', function (e) {
+      startX = e.touches[0].clientX; dx = 0; swiping = true; stop();
+    }, { passive: true });
+    track.addEventListener('touchmove', function (e) {
+      if (!swiping) return; dx = e.touches[0].clientX - startX;
+    }, { passive: true });
+    track.addEventListener('touchend', function () {
+      if (!swiping) return; swiping = false;
+      if (Math.abs(dx) > 45) { if (dx < 0) nextSlide(); else prevSlide(); }
+      start();
+    });
+
+    // Keyboard arrows when carousel focused
+    root.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight') { nextSlide(); restart(); }
+      else if (e.key === 'ArrowLeft') { prevSlide(); restart(); }
+    });
+
+    go(0);
+    start();
+  })();
+
+  // ============================================================
+  // PRODUCT CATALOGUE — client-side numbered pagination
+  // Desktop (>=1024px): 20 per page (5 cols × 4 rows)
+  // Mobile  (<1024px) : 16 per page (2 cols × 8 rows)
+  // Re-paginates on resize when the breakpoint is crossed so each page
+  // is always an exact 5×4 / 2×8 block.
+  // Flipkart-style Sort By reorders the cards in the DOM, then re-paginates.
+  // ============================================================
+  (function () {
+    var section = document.getElementById('catalogue');
+    var grid = document.getElementById('catalogue-grid');
+    var pager = document.getElementById('catalogue-pager');
+    if (!section || !grid || !pager) return;
+
+    var cards = Array.prototype.slice.call(grid.querySelectorAll('.cat-card'));
+    if (!cards.length) return;
+
+    // Remember the original (server) order so "Relevance" can be restored.
+    cards.forEach(function (c, i) { c.__order = i; });
+
+    var perDesktop = parseInt(section.getAttribute('data-per-desktop'), 10) || 20;
+    var perMobile = parseInt(section.getAttribute('data-per-mobile'), 10) || 16;
+    var DESKTOP_MQ = window.matchMedia('(min-width: 1024px)');
+
+    var current = 1;
+    var perPage = DESKTOP_MQ.matches ? perDesktop : perMobile;
+
+    function num(card, attr) {
+      var v = card.getAttribute(attr);
+      if (v === null || v === '') return NaN;
+      var n = parseFloat(v);
+      return isNaN(n) ? NaN : n;
+    }
+
+    // ---- Sort By ----
+    var sortSel = document.getElementById('catalogue-sort');
+    function applySort(mode) {
+      var sorted = cards.slice();
+      var BIG = Number.MAX_SAFE_INTEGER;
+      function price(c) { var n = num(c, 'data-price'); return isNaN(n) ? null : n; }
+      if (mode === 'price-asc') {
+        sorted.sort(function (a, b) {
+          var pa = price(a), pb = price(b);
+          if (pa === null && pb === null) return a.__order - b.__order;
+          if (pa === null) return 1;            // no-price sinks to bottom
+          if (pb === null) return -1;
+          return pa - pb || a.__order - b.__order;
+        });
+      } else if (mode === 'price-desc') {
+        sorted.sort(function (a, b) {
+          var pa = price(a), pb = price(b);
+          if (pa === null && pb === null) return a.__order - b.__order;
+          if (pa === null) return 1;
+          if (pb === null) return -1;
+          return pb - pa || a.__order - b.__order;
+        });
+      } else if (mode === 'latest') {
+        sorted.sort(function (a, b) { return (num(b, 'data-date') || 0) - (num(a, 'data-date') || 0) || a.__order - b.__order; });
+      } else if (mode === 'oldest') {
+        sorted.sort(function (a, b) { return (num(a, 'data-date') || 0) - (num(b, 'data-date') || 0) || a.__order - b.__order; });
+      } else if (mode === 'popularity') {
+        sorted.sort(function (a, b) { return (num(b, 'data-pop') || 0) - (num(a, 'data-pop') || 0) || a.__order - b.__order; });
+      } else if (mode === 'discount') {
+        sorted.sort(function (a, b) { return (num(b, 'data-disc') || 0) - (num(a, 'data-disc') || 0) || a.__order - b.__order; });
+      } else {
+        // relevance — restore original order
+        sorted.sort(function (a, b) { return a.__order - b.__order; });
+      }
+      // Re-append in the new order (DocumentFragment = single reflow)
+      var frag = document.createDocumentFragment();
+      sorted.forEach(function (c) { frag.appendChild(c); });
+      grid.appendChild(frag);
+      cards = sorted;
+      showPage(1);
+    }
+    if (sortSel) {
+      sortSel.addEventListener('change', function () { applySort(sortSel.value); });
+    }
+
+    function pageCount() {
+      return Math.max(1, Math.ceil(cards.length / perPage));
+    }
+
+    function showPage(page) {
+      var total = pageCount();
+      if (page < 1) page = 1;
+      if (page > total) page = total;
+      current = page;
+      var startIdx = (page - 1) * perPage;
+      var endIdx = startIdx + perPage;
+      for (var i = 0; i < cards.length; i++) {
+        if (i >= startIdx && i < endIdx) cards[i].classList.remove('is-hidden');
+        else cards[i].classList.add('is-hidden');
+      }
+      renderPager();
+    }
+
+    function makeBtn(label, page, opts) {
+      opts = opts || {};
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cat-page' + (opts.nav ? ' cat-page--nav' : '') + (opts.active ? ' is-active' : '');
+      b.innerHTML = label;
+      if (opts.active) b.setAttribute('aria-current', 'page');
+      if (opts.disabled) { b.disabled = true; }
+      else {
+        b.addEventListener('click', function () {
+          showPage(page);
+          // scroll the top of the catalogue (heading or sort bar) into view
+          var anchor = section.querySelector('.catalogue__head') || section.querySelector('.cat-sort') || section;
+          if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
+      return b;
+    }
+
+    function ellipsis() {
+      var s = document.createElement('span');
+      s.className = 'cat-page cat-page--ellipsis';
+      s.textContent = '…';
+      return s;
+    }
+
+    function renderPager() {
+      var total = pageCount();
+      pager.innerHTML = '';
+      if (total <= 1) return;
+
+      pager.appendChild(makeBtn('<i class="fas fa-chevron-left"></i>', current - 1, { nav: true, disabled: current === 1 }));
+
+      // Build a windowed page list: 1 … (c-1) c (c+1) … last
+      var pages = [];
+      var i;
+      for (i = 1; i <= total; i++) {
+        if (i === 1 || i === total || (i >= current - 1 && i <= current + 1)) {
+          pages.push(i);
+        } else if (pages[pages.length - 1] !== '...') {
+          pages.push('...');
+        }
+      }
+      for (i = 0; i < pages.length; i++) {
+        if (pages[i] === '...') pager.appendChild(ellipsis());
+        else pager.appendChild(makeBtn(String(pages[i]), pages[i], { active: pages[i] === current }));
+      }
+
+      pager.appendChild(makeBtn('<i class="fas fa-chevron-right"></i>', current + 1, { nav: true, disabled: current === total }));
+    }
+
+    function onBreakpointChange() {
+      var newPer = DESKTOP_MQ.matches ? perDesktop : perMobile;
+      if (newPer === perPage) return;
+      // Keep the user roughly where they were when columns change
+      var firstVisible = (current - 1) * perPage;
+      perPage = newPer;
+      showPage(Math.floor(firstVisible / perPage) + 1);
+    }
+
+    if (DESKTOP_MQ.addEventListener) DESKTOP_MQ.addEventListener('change', onBreakpointChange);
+    else if (DESKTOP_MQ.addListener) DESKTOP_MQ.addListener(onBreakpointChange);
+
+    showPage(1);
+  })();
 })();

@@ -37,8 +37,9 @@ generic template.
 ## Currently Completed Features
 - **Homepage** (`/`) — hero search, category grid, top picks, buying guides, latest deals,
   newsletter CTA, blog teasers.
-- **Deals listing** (`/deals`) — all published deals.
-- **Category pages** (`/category/:slug`) — deals + buying guides per category.
+- **Deals listing** (`/deals`) — all published deals in the sortable, paginated catalogue grid.
+- **Category pages** (`/category/:slug`) — **clean, catalogue-only** layout (no guide cards / no
+  facet sidebar): a slim category title followed directly by the sortable, paginated product grid.
 - **Review / money pages** (`/reviews/:slug`) — product gallery, multi-retailer price box
   (cheapest highlighted), pros/cons, markdown review, FAQ, related deals.
 - **Blog index** (`/blog`) + **single post** (`/blog/:slug`) — markdown body, author/date,
@@ -74,30 +75,72 @@ generic template.
     (SVG fractal-noise grain + sepia crease blotches + vignette) for a classic,
     retro, luxury-fashion editorial feel.
   - **Dark mode**: deep navy slate with bright cyan/violet accents (clean, no texture).
-- **Animated announcement bar** — colourful gradient strip with the trust message
-  scrolling as a seamless right→left marquee (pauses on hover, respects reduced-motion).
+- **Animated announcement bar** — colourful gradient strip with **multiple rotating
+  fashion/trust messages** (new-season styles, free-shipping deals, up-to-70%-off, "we test
+  before we recommend", hourly lightning deals) scrolling as a seamless right→left marquee
+  (pauses on hover, respects reduced-motion).
+- **Animated Home icon** in the main nav (before "Deals") — links to the homepage with a
+  springy hover (gradient wash sweeps up, icon bobs) and a gentle looping attention ring.
+- **Product Catalogue grid** (homepage, `/deals`, every `/category/:slug`) — dense responsive
+  grid that is **5 columns × 4 rows = 20 per page on desktop** and **2 columns × 8 rows = 16 per
+  page on mobile**, with **numbered pagination** (windowed `1 … n` with prev/next) below. Every
+  product photo sits in a fixed square box with `object-contain` for perfect, uniform fit.
+- **Flipkart-style "Sort By"** on every catalogue (homepage, deals, all categories):
+  Relevance, Price Low→High, Price High→Low, Newest, Oldest, Popularity, Discount. Sorting
+  reorders cards client-side and re-paginates from page 1; products without a price sink to the
+  bottom on price sorts.
 - **Performance** — strict image `width`/`height` (zero CLS), lazy images, skeleton loaders, and
   heavy matrices lazy-revealed on scroll via `IntersectionObserver`. Respects `prefers-reduced-motion`.
 - **Rich product blog** — 10 in-depth posts (long-term reviews, head-to-heads, setup & buying
   guides) with bylines, deks, read times, linked products, embedded matrices, and FAQ schema.
 
-### Admin Blog Editor (private)
-A self-contained, password-protected CMS at **`/admin`** for writing and managing blog posts —
-no third-party CMS required, fully Cloudflare-Workers-native (Web Crypto auth, D1 storage).
+### Hero Product Carousel (homepage)
+- The **first, fully-visible element** on the homepage is a glassmorphism **product carousel**
+  (8 banners). Each banner shows the **product image on the left** and **name, rating,
+  short description, best price + Buy Now** on the right, over a frosted-glass gradient.
+- **Consistent height across all products** — the banner is a fixed 380px tall and the body
+  reserves uniform slots (eyebrow, 2-line title, rating, 2-line description) so the layout never
+  grows/shrinks between products.
+- **Image fits its container fully** (`object-fit: cover`) and **zooms within the container**
+  on hover — the media box is `overflow: hidden` so the zoom is cleanly clipped.
+- **Autoplays** automatically (**3s/slide**), with **small, tightly-aligned bubbly dots** that
+  never overlap product content, prev/next arrows, swipe, keyboard arrows, and pause-on-hover/
+  focus/tab-hidden. Respects `prefers-reduced-motion`.
+- **Mobile-adaptive**: on phones each slide collapses to just the **product image + a compact
+  Buy button** beneath it (links straight to the retailer via `/go/:slug`), like Flipkart/Amazon.
+- **Admin-managed**: pick & order which up-to-8 products appear from **`/admin/carousel`**
+  (drag to reorder; live "x / 8" counter; searchable product picker). If fewer than 8 are
+  chosen, featured/latest products fill the rest so the hero is never empty. Selection is
+  persisted in the `site_settings` table (key `hero_carousel`, JSON array of product IDs).
+
+### Admin CMS (private)
+A self-contained, password-protected admin at **`/admin`** — no third-party CMS required,
+fully Cloudflare-Workers-native (Web Crypto auth, D1 storage). Manages **blog posts,
+products (with prices & buy links), and the hero carousel.**
 - **Login**: `/admin/login` — password checked server-side against the `ADMIN_PASSWORD` secret.
   On success an HMAC-signed, 12-hour cookie token (signed with `ADMIN_SECRET`) is issued.
-- **Dashboard**: lists all posts (published + drafts) with view/edit/delete actions.
-- **Editor**: full Markdown body editor + title, auto-slug, dek, excerpt, cover image, category,
-  type, read-time, author/role, and Published / Buying-guide (pillar) toggles. Slug-uniqueness
-  validated. New posts appear instantly on `/blog`, the sitemap and RSS.
+  **Default password: `admin`.**
+- **Posts**: dashboard lists all posts (published + drafts) with view/edit/duplicate/delete;
+  full Markdown editor + SEO panel with live Google preview.
+- **Products** (`/admin/products`): full catalogue manager. Create/edit/delete products with
+  **name, slug, brand, image URL (with live preview), short + full description (Markdown),
+  category, rating, pros/cons**, and a **dynamic multi-store "Prices & Buy links" section**
+  (retailer, price, M.R.P., in-stock, Buy Now URL). The cheapest offer becomes the "best price";
+  each Buy link is stored as a tracked affiliate link routed via `/go/:slug`. One-click
+  publish/feature toggles. Deleting a product cleanly cascades its offers + affiliate links.
+- **Carousel** (`/admin/carousel`): the product picker described above.
+- **Images everywhere**: blog/product Markdown now embeds **bare image URLs on their own line**,
+  pasted **raw `<img>` tags**, and `![alt](url)` syntax. All `<img>` use
+  `referrerpolicy="no-referrer"` + an `onerror` fallback so hotlink-protected blog/CDN images
+  (e.g. Blogspot) load reliably — fixing the earlier "image via link not showing" problem.
 - **Security**: `/admin*` is `noindex,nofollow` and disallowed in `robots.txt`; cookie is
   `HttpOnly; Secure; SameSite=Lax`.
 - **Setup secrets** (production):
   ```bash
-  npx wrangler pages secret put ADMIN_PASSWORD   # your private password
+  npx wrangler pages secret put ADMIN_PASSWORD   # your private password (overrides 'admin')
   npx wrangler pages secret put ADMIN_SECRET      # any long random string for signing
   ```
-  Local dev reads these from `.dev.vars` (git-ignored). Default local password: `dealspot-admin`.
+  Local dev reads these from `.dev.vars` (git-ignored). Default local password: `admin`.
 - **Legal/compliance**: `/affiliate-disclosure`, `/privacy-policy`, `/terms-of-service`,
   `/about`, `/contact`, sitewide affiliate disclosure in footer, per-page affiliate notice,
   and a cookie-consent banner.
@@ -113,10 +156,17 @@ no third-party CMS required, fully Cloudflare-Workers-native (Web Crypto auth, D
 | `/best/:slug` | GET | Hub page — spokes pulled programmatically by rule |
 | `/compare?ids=1,2,3` | GET | Side-by-side comparison matrix (max 4) |
 | `/admin` | GET | **Admin dashboard** (auth-gated) — list/manage posts |
-| `/admin/login` | GET/POST | Admin sign-in (password) |
+| `/admin/login` | GET/POST | Admin sign-in (password — default `admin`) |
 | `/admin/new` | GET/POST | Create a blog post (Markdown editor) |
 | `/admin/edit/:id` | GET/POST | Edit a post |
 | `/admin/delete/:id` | POST | Delete a post |
+| `/admin/products` | GET | **Product catalogue manager** (list/search/filter) |
+| `/admin/products/new` | GET/POST | Create a product (with image, prices & buy links) |
+| `/admin/products/edit/:id` | GET/POST | Edit a product + its offers |
+| `/admin/products/delete/:id` | POST | Delete a product (cascades offers + links) |
+| `/admin/products/toggle/:id` | POST | Publish / unpublish a product |
+| `/admin/products/feature/:id` | POST | Toggle featured |
+| `/admin/carousel` | GET/POST | **Pick & order the 8 hero-carousel products** |
 | `/admin/logout` | POST | Sign out |
 | `/reviews/:slug` | GET | Single product review / money page |
 | `/blog` | GET | Blog index |
@@ -184,9 +234,10 @@ npm run db:reset
   5. Deploy via the Cloudflare deploy flow (`npm run deploy`).
 
 ## Features Not Yet Implemented
-- Real affiliate links (seed data uses placeholder tagged URLs — replace before going live).
-- An admin UI for non-technical editing (content is currently managed via SQL/seed).
-- Pagination on blog/deal listings (currently capped lists).
+- Real affiliate links (seed data uses placeholder tagged URLs — replace via the admin product
+  editor before going live).
+- Image **uploads** (admin accepts image URLs; no runtime file storage — by design on Pages).
+- Pagination on blog listings (the product catalogues ARE paginated: 20/page desktop, 16/page mobile).
 - Price-history tracking / automated price refresh.
 - Analytics dashboards (GA4 / Clarity script slots — add your IDs in `layout.tsx`).
 - Email delivery for the newsletter (emails are stored; no sending integration yet).
@@ -206,4 +257,6 @@ npm run db:reset
 - Cloudflare Pages + Workers runtime · Cloudflare D1 (SQLite)
 - Tailwind CSS (CDN) · Font Awesome (CDN)
 
-**Last Updated**: 2026-06-24 (vintage paper light theme + seamless marquee + 4-item nav)
+**Last Updated**: 2026-06-24 (catalogue grid 5×4/2×8 + Flipkart-style Sort By everywhere +
+clean category pages + animated Home nav icon + multi-message marquee + hero consistent
+height/cover-fit/zoom + 3s autoplay + smaller dots)

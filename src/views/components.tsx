@@ -83,6 +83,86 @@ export function DualCardCta(deal: Deal, sourcePath: string): string {
   return `<div class="flex gap-2.5">${buy}${view}</div>`
 }
 
+// ============================================================
+// HERO PRODUCT CAROUSEL
+// 8 glassmorphism banners: product image on the left, name / info /
+// price / Buy Now on the right. Auto-plays with bubbly animated dot
+// indicators (Flipkart/Amazon style), arrows, and swipe support (JS in
+// app.js). Falls back gracefully if a product has no image/price/offer.
+// ============================================================
+export function HeroCarousel(deals: Deal[], sourcePath = '/'): string {
+  if (!deals.length) return ''
+
+  const slides = deals
+    .map((d, i) => {
+      const cheapest = (d.offers || [])
+        .filter((o) => o.price != null)
+        .sort((a, b) => (a.price as number) - (b.price as number))[0]
+      const buyable = (d.offers || [])
+        .filter((o) => o.affiliate_slug)
+        .sort((a, b) => (a.price ?? 1e12) - (b.price ?? 1e12))[0]
+      const disc = cheapest ? discountPct(cheapest.price, cheapest.original_price) : null
+      const meta = buyable ? retailerMeta(buyable.retailer) : null
+      const buyHref = buyable ? `/go/${buyable.affiliate_slug}?from=${encodeURIComponent(sourcePath)}` : ''
+
+      const priceBlock = cheapest
+        ? `<div class="hero-slide__pricerow">
+             <span class="hero-slide__pricelabel">Best price</span>
+             <span class="hero-slide__price">${formatPrice(cheapest.price, cheapest.currency)}</span>
+             ${cheapest.original_price && disc ? `<span class="hero-slide__mrp">${formatPrice(cheapest.original_price, cheapest.currency)}</span><span class="hero-slide__off">${disc}% off</span>` : ''}
+           </div>`
+        : `<div class="hero-slide__pricerow"><span class="hero-slide__price hero-slide__price--check">See latest price</span></div>`
+
+      const cta = buyable
+        ? `<a href="${buyHref}" rel="nofollow sponsored noopener" target="_blank" class="btn btn-buy hero-slide__buy" title="Buy on ${meta!.name}"><i class="fas fa-cart-shopping text-[0.8rem]"></i> Buy Now <i class="fas fa-arrow-up-right-from-square text-[0.62rem] opacity-80"></i></a>`
+        : `<a href="/reviews/${d.slug}" class="btn btn-buy hero-slide__buy">View Product <i class="fas fa-arrow-right text-[0.72rem]"></i></a>`
+
+      return `<div class="hero-slide" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${deals.length}" data-index="${i}">
+        <div class="hero-slide__glass">
+          <div class="hero-slide__media">
+            ${d.award ? `<span class="hero-slide__badge">${d.award}</span>` : (d.featured ? `<span class="hero-slide__badge">Editor's Pick</span>` : '')}
+            ${d.image_url
+              ? `<img src="${d.image_url}" alt="${d.title}" loading="${i === 0 ? 'eager' : 'lazy'}" referrerpolicy="no-referrer" class="hero-slide__img" onerror="this.style.display='none';this.parentElement.querySelector('.hero-slide__noimg')?.style.setProperty('display','flex')" />`
+              : ''}
+            <div class="hero-slide__noimg" ${d.image_url ? 'style="display:none"' : ''}><i class="fas fa-box-open"></i></div>
+            ${buyable
+              ? `<a href="${buyHref}" rel="nofollow sponsored noopener" target="_blank" class="hero-slide__mbuy"><i class="fas fa-cart-shopping"></i> Buy</a>`
+              : `<a href="/reviews/${d.slug}" class="hero-slide__mbuy hero-slide__mbuy--view">View</a>`}
+          </div>
+          <div class="hero-slide__body">
+            <div class="hero-slide__eyebrow-slot">${d.category_name ? `<a href="/category/${d.category_slug}" class="hero-slide__eyebrow">${d.brand ? d.brand + ' · ' : ''}${d.category_name}</a>` : (d.brand ? `<span class="hero-slide__eyebrow">${d.brand}</span>` : '')}</div>
+            <h2 class="hero-slide__title"><a href="/reviews/${d.slug}">${d.title}</a></h2>
+            <div class="hero-slide__rating">${d.rating ? `${stars(d.rating, 'text-[0.8rem]')}<span>${d.rating.toFixed(1)}${d.rating_count ? ` (${d.rating_count.toLocaleString('en-IN')})` : ''}</span>` : ''}</div>
+            <p class="hero-slide__desc">${d.short_desc || d.verdict || d.spec_summary || ''}</p>
+            ${priceBlock}
+            <div class="hero-slide__actions">
+              ${cta}
+              <a href="/reviews/${d.slug}" class="btn btn-view hero-slide__view">Details</a>
+            </div>
+          </div>
+        </div>
+      </div>`
+    })
+    .join('')
+
+  const dots = deals
+    .map(
+      (_, i) =>
+        `<button class="hero-dot${i === 0 ? ' is-active' : ''}" data-dot="${i}" aria-label="Go to slide ${i + 1}"><span class="hero-dot__fill"></span></button>`
+    )
+    .join('')
+
+  return `
+  <section class="hero-carousel" id="hero-carousel" aria-roledescription="carousel" aria-label="Featured products" data-autoplay="3000">
+    <div class="hero-carousel__viewport">
+      <div class="hero-carousel__track" id="hero-track">${slides}</div>
+    </div>
+    <button class="hero-arrow hero-arrow--prev" id="hero-prev" aria-label="Previous product"><i class="fas fa-chevron-left"></i></button>
+    <button class="hero-arrow hero-arrow--next" id="hero-next" aria-label="Next product"><i class="fas fa-chevron-right"></i></button>
+    <div class="hero-dots" id="hero-dots" role="tablist" aria-label="Choose product">${dots}</div>
+  </section>`
+}
+
 // ---- Price comparison box (editorial, hairline rows) ----
 export function PriceBox(deal: Deal, sourcePath: string): string {
   const offers = (deal.offers || []).slice().sort((a, b) => (a.price ?? 1e12) - (b.price ?? 1e12))
@@ -180,6 +260,123 @@ export function DealGrid(deals: Deal[], ranked = false, sourcePath?: string, com
   return `<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">${deals
     .map((d, i) => DealCard(d, { rank: ranked ? i + 1 : undefined, sourcePath, compare }))
     .join('')}</div>`
+}
+
+// ============================================================
+// CATALOGUE — dense responsive product grid with Flipkart-style "Sort By",
+// numbered pagination, and uniform image fit.
+// Desktop: 5 cols × 4 rows = 20 per page · Mobile: 2 cols × 8 rows = 16 per page
+// All cards render server-side; sorting + pagination are handled client-side
+// in app.js (catalogue IIFE) so each page is an exact 5×4 / 2×8 block.
+// Image fit: fixed square aspect box + object-contain centers every photo
+// uniformly regardless of source dimensions.
+// ============================================================
+function CatalogueCard(deal: Deal, sourcePath: string): string {
+  const cheapest = (deal.offers || [])
+    .filter((o) => o.price != null)
+    .sort((a, b) => (a.price as number) - (b.price as number))[0]
+  const disc = cheapest ? discountPct(cheapest.price, cheapest.original_price) : null
+  const buyable = (deal.offers || [])
+    .filter((o) => o.affiliate_slug)
+    .sort((a, b) => (a.price ?? 1e12) - (b.price ?? 1e12))[0]
+  const buyHref = buyable ? `/go/${buyable.affiliate_slug}?from=${encodeURIComponent(sourcePath)}` : ''
+
+  const img = deal.image_url
+    ? `<img src="${escapeAttr(deal.image_url)}" alt="${escapeAttr(deal.title)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="cat-card__img" onerror="this.style.display='none';this.parentElement.querySelector('.cat-card__noimg')?.style.setProperty('display','flex')" />`
+    : ''
+
+  const cta = buyable
+    ? `<a href="${buyHref}" rel="nofollow sponsored noopener" target="_blank" class="cat-card__buy" title="Buy now"><i class="fas fa-cart-shopping"></i> Buy</a>`
+    : `<a href="/reviews/${deal.slug}" class="cat-card__buy cat-card__buy--view">View</a>`
+
+  // Sort keys: price (cheapest, blank → very large so it sinks on low-high),
+  // created timestamp for latest/oldest, rating_count as a popularity proxy.
+  const priceKey = cheapest?.price ?? ''
+  const dateKey = deal.created_at ? Date.parse(deal.created_at) || 0 : 0
+  const popKey = (deal.rating_count ?? 0)
+
+  return `<article class="cat-card"
+      data-price="${priceKey}"
+      data-date="${dateKey}"
+      data-pop="${popKey}"
+      data-rating="${deal.rating ?? 0}"
+      data-disc="${disc ?? 0}">
+    <a href="/reviews/${deal.slug}" class="cat-card__media" aria-label="${escapeAttr(deal.title)}">
+      ${img}
+      <div class="cat-card__noimg" ${deal.image_url ? 'style="display:none"' : ''}><i class="fas fa-box-open"></i></div>
+      ${disc ? `<span class="cat-card__off">−${disc}%</span>` : ''}
+      ${deal.award ? `<span class="cat-card__badge">${escapeAttr(deal.award)}</span>` : (deal.featured ? `<span class="cat-card__badge">Pick</span>` : '')}
+    </a>
+    <div class="cat-card__body">
+      ${deal.category_name ? `<span class="cat-card__eyebrow">${escapeAttr(deal.category_name)}</span>` : ''}
+      <h3 class="cat-card__title"><a href="/reviews/${deal.slug}">${deal.title}</a></h3>
+      <div class="cat-card__foot">
+        <div class="cat-card__price">
+          ${cheapest
+            ? `<span class="cat-card__amt">${formatPrice(cheapest.price, cheapest.currency)}</span>${cheapest.original_price && disc ? `<span class="cat-card__mrp">${formatPrice(cheapest.original_price, cheapest.currency)}</span>` : ''}`
+            : `<span class="cat-card__amt cat-card__amt--check">See price</span>`}
+        </div>
+        ${cta}
+      </div>
+    </div>
+  </article>`
+}
+
+// Flipkart-style Sort By control. `relevance` keeps the server-provided order.
+function SortBar(total: number): string {
+  const opts = [
+    ['relevance', 'Relevance'],
+    ['price-asc', 'Price — Low to High'],
+    ['price-desc', 'Price — High to Low'],
+    ['latest', 'Newest First'],
+    ['oldest', 'Oldest First'],
+    ['popularity', 'Popularity'],
+    ['discount', 'Discount'],
+  ]
+  return `<div class="cat-sort" data-count="${total}">
+    <p class="cat-sort__count"><span class="cat-sort__num">${total}</span> product${total === 1 ? '' : 's'}</p>
+    <div class="cat-sort__right">
+      <label class="cat-sort__label" for="catalogue-sort">Sort by</label>
+      <div class="cat-sort__select">
+        <select id="catalogue-sort" aria-label="Sort products">
+          ${opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+        </select>
+        <i class="fas fa-chevron-down cat-sort__caret"></i>
+      </div>
+    </div>
+  </div>`
+}
+
+/**
+ * CatalogueGrid — reusable paginated + sortable product grid.
+ * opts.heading   → optional centred heading block (homepage uses it)
+ * opts.eyebrow / opts.title / opts.subtitle → heading content
+ */
+export function CatalogueGrid(
+  deals: Deal[],
+  sourcePath = '/',
+  opts: { heading?: boolean; eyebrow?: string; title?: string; subtitle?: string } = {}
+): string {
+  if (!deals.length)
+    return `<div class="text-center py-20 text-ink-faint"><i class="fas fa-box-open text-3xl mb-3"></i><p>Nothing here yet — check back soon.</p></div>`
+  const cards = deals.map((d) => CatalogueCard(d, sourcePath)).join('')
+  const head = opts.heading
+    ? `<div class="catalogue__head">
+        ${opts.eyebrow ? `<span class="eyebrow eyebrow-mute">${opts.eyebrow}</span>` : ''}
+        ${opts.title ? `<h2 class="catalogue__title">${opts.title}</h2>` : ''}
+        ${opts.subtitle ? `<p class="catalogue__sub">${opts.subtitle}</p>` : ''}
+      </div>`
+    : ''
+  return `
+  <section class="catalogue" id="catalogue" aria-label="Product catalogue"
+           data-per-desktop="20" data-per-mobile="16" data-total="${deals.length}">
+    <div class="max-w-editorial mx-auto px-5 py-12 md:py-16">
+      ${head}
+      ${SortBar(deals.length)}
+      <div class="catalogue__grid" id="catalogue-grid">${cards}</div>
+      <nav class="catalogue__pager" id="catalogue-pager" aria-label="Catalogue pages"></nav>
+    </div>
+  </section>`
 }
 
 // ---- Comparison table (editorial) ----

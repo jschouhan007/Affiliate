@@ -60,7 +60,7 @@ export async function verifyToken(
 
 export function checkPassword(input: string, env: { ADMIN_PASSWORD?: string }): boolean {
   // If no password configured, allow a dev default so /admin is reachable locally.
-  const pw = env.ADMIN_PASSWORD || 'dealspot-admin'
+  const pw = env.ADMIN_PASSWORD || 'admin'
   return !!input && safeEqual(input, pw)
 }
 

@@ -136,10 +136,20 @@ function TopBar(): string {
   // left, the second group sits exactly where the first started — looping with
   // no visible jump or gap. Each group repeats the message enough times to
   // always span the widest screens.
-  const msg = `<span class="topbar__item"><i class="fas fa-vial-circle-check"></i> Independent &amp; reader-supported — we test before we recommend</span>`
-  const group = `<div class="topbar__group" aria-hidden="false">${msg}${msg}${msg}</div>`
+  // Several short fashion-forward messages, separated by a diamond, scrolling
+  // right→left in a seamless loop.
+  const phrases = [
+    `<i class="fas fa-shirt"></i> New season styles, hand-picked &amp; price-checked daily`,
+    `<i class="fas fa-truck-fast"></i> Free shipping deals across top fashion stores`,
+    `<i class="fas fa-tags"></i> Up to 70% off — curated fashion, tech &amp; home finds`,
+    `<i class="fas fa-vial-circle-check"></i> Independent &amp; reader-supported — we test before we recommend`,
+    `<i class="fas fa-bolt"></i> Lightning deals refreshed every hour`,
+  ]
+  const sep = `<span class="topbar__sep">&#9670;</span>`
+  const msg = phrases.map((p) => `<span class="topbar__item">${p}</span>`).join(sep)
+  const group = `<div class="topbar__group" aria-hidden="false">${msg}${sep}</div>`
   return `
-  <div class="topbar text-[0.72rem] tracking-[0.14em] uppercase font-medium" role="marquee" aria-label="Independent and reader-supported — we test before we recommend">
+  <div class="topbar text-[0.72rem] tracking-[0.14em] uppercase font-medium" role="marquee" aria-label="DealSpot announcements">
     <div class="topbar__inner h-9 flex items-center overflow-hidden">
       <div class="topbar__track">
         ${group}${group}
@@ -167,6 +177,9 @@ function Header(categories: Category[]): string {
           <span class="font-serif text-2xl font-bold tracking-tight text-ink">DealSpot</span>
         </a>
         <nav class="hidden md:flex items-center gap-1 text-[0.92rem] font-medium">
+          <a href="/" class="nav-home" aria-label="Home" title="Home">
+            <i class="fas fa-house nav-home__icon"></i>
+          </a>
           <a href="/deals" class="nav-link">Deals</a>
           <div class="relative nav-dropdown">
             <button class="nav-link flex items-center gap-1.5" aria-haspopup="true" aria-expanded="false">Categories <i class="fas fa-chevron-down text-[0.6rem] transition-transform duration-300 nav-caret"></i></button>
@@ -192,6 +205,7 @@ function Header(categories: Category[]): string {
     </div>
     <div id="mobile-menu" class="mobile-menu md:hidden">
       <div class="px-5 py-4 space-y-1">
+        <a href="/" class="mobile-link mobile-link--home"><i class="fas fa-house mr-2.5 text-accent"></i>Home</a>
         <a href="/deals" class="mobile-link">Deals</a>
         <a href="/best" class="mobile-link">Best Of</a>
         <a href="/guides" class="mobile-link">Buying Guides</a>

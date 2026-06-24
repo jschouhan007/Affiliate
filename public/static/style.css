@@ -137,10 +137,16 @@ body, .card, .btn, header, footer, input {
   gap: 0.5rem;
   color: #ffffff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
-  padding: 0 2.5rem;   /* spacing between repeats */
+  padding: 0 1.25rem;   /* spacing between phrases */
   white-space: nowrap;
 }
 .topbar__item i { color: rgba(255, 255, 255, 0.95); }
+.topbar__sep {
+  display: inline-flex; align-items: center;
+  font-size: 0.55rem;
+  color: rgba(255,255,255,0.6);
+  padding: 0 0.15rem;
+}
 @keyframes topbar-marquee {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
@@ -630,6 +636,56 @@ input[type="checkbox"], input[type="radio"]{ accent-color: var(--accent); width:
 .nav-link.active { color: var(--accent); }
 .nav-link.active::after { transform: scaleX(1); }
 
+/* ---- Animated Home icon button (before Deals) ---- */
+.nav-home {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.5rem; height: 2.5rem; margin-right: 0.15rem;
+  border-radius: 0.8rem;
+  color: var(--ink-soft);
+  background: transparent;
+  overflow: hidden;
+  transition: color 0.25s ease, background 0.3s ease, transform 0.3s cubic-bezier(0.2,0.8,0.2,1);
+}
+/* gradient wash that sweeps up on hover */
+.nav-home::before {
+  content: ''; position: absolute; inset: 0; z-index: 0;
+  background: var(--flame); opacity: 0;
+  transform: translateY(100%);
+  transition: transform 0.4s cubic-bezier(0.2,0.8,0.2,1), opacity 0.3s ease;
+}
+.nav-home__icon {
+  position: relative; z-index: 1;
+  font-size: 1.05rem;
+  transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+.nav-home:hover { color: #fff; transform: translateY(-2px); box-shadow: 0 10px 22px -12px rgba(200,29,74,0.65); }
+.nav-home:hover::before { opacity: 1; transform: translateY(0); }
+.nav-home:hover .nav-home__icon { animation: home-bob 0.9s ease-in-out infinite; }
+.nav-home:active { transform: translateY(0) scale(0.94); }
+/* a soft pulsing ring to draw the eye, looping gently */
+.nav-home::after {
+  content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit;
+  border: 2px solid var(--accent); opacity: 0;
+  animation: home-ring 3.2s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes home-bob {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  30%      { transform: translateY(-3px) rotate(-6deg); }
+  60%      { transform: translateY(-1px) rotate(5deg); }
+}
+@keyframes home-ring {
+  0%   { opacity: 0; transform: scale(0.7); }
+  35%  { opacity: 0.5; }
+  70%  { opacity: 0; transform: scale(1.25); }
+  100% { opacity: 0; transform: scale(1.25); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-home::after { animation: none; }
+  .nav-home:hover .nav-home__icon { animation: none; }
+}
+
 /* ---- Categories dropdown: smooth fade + lift ---- */
 .nav-menu {
   opacity: 0; visibility: hidden; transform: translate(-50%, 6px);
@@ -724,3 +780,494 @@ input[type="checkbox"], input[type="radio"]{ accent-color: var(--accent); width:
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ============================================================
+   HERO PRODUCT CAROUSEL — glassmorphism banners + bubbly dots
+   Image left / info right. Slides translate via JS (.hero-carousel__track
+   transform). Works on the textured paper (light) and dark themes.
+   ============================================================ */
+.hero-carousel {
+  position: relative;
+  max-width: 80rem;            /* matches max-w-editorial */
+  margin: 1.75rem auto 0;
+  padding: 0 1.25rem;
+}
+.hero-carousel__viewport {
+  overflow: hidden;
+  border-radius: 1.75rem;
+}
+.hero-carousel__track {
+  display: flex;
+  width: 100%;
+  will-change: transform;
+  transition: transform 0.65s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.hero-slide {
+  flex: 0 0 100%;
+  min-width: 100%;
+  padding: 2px;               /* room for the glass border glow */
+}
+
+/* The glass banner itself */
+.hero-slide__glass {
+  position: relative;
+  display: grid;
+  grid-template-columns: 42% 58%;
+  align-items: stretch;
+  /* Fixed height keeps EVERY slide identical regardless of product content */
+  height: 380px;
+  border-radius: 1.6rem;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--flame);   /* colourful gradient base shows through glass */
+}
+/* frosted glass overlay over the gradient */
+.hero-slide__glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(120deg, rgba(255,255,255,0.18), rgba(255,255,255,0.05) 40%, rgba(255,255,255,0.12));
+  backdrop-filter: blur(2px) saturate(1.1);
+  -webkit-backdrop-filter: blur(2px) saturate(1.1);
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 1.6rem;
+  pointer-events: none;
+}
+/* soft floating orbs for depth */
+.hero-slide__glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(40% 55% at 12% 18%, rgba(255,255,255,0.30), transparent 60%),
+    radial-gradient(45% 60% at 88% 88%, rgba(255,255,255,0.16), transparent 60%);
+  pointer-events: none;
+}
+
+/* LEFT: product image on a frosted card. overflow:hidden so the hover zoom
+   stays clipped *within* the container instead of spilling over the glass. */
+.hero-slide__media {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 1rem;
+  border-radius: 1.25rem;
+  overflow: hidden;            /* clip the zoom to the container */
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(8px) saturate(1.2);
+  -webkit-backdrop-filter: blur(8px) saturate(1.2);
+  border: 1px solid rgba(255,255,255,0.6);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 18px 40px -24px rgba(0,0,0,0.5);
+}
+/* Image fills the whole media container; cover makes it edge-to-edge so it
+   "fits fully". Zoom on hover stays inside via the parent's overflow:hidden. */
+.hero-slide__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: drop-shadow(0 8px 16px rgba(0,0,0,0.18));
+  transition: transform 0.6s cubic-bezier(0.2,0.8,0.2,1);
+}
+.hero-slide:hover .hero-slide__img { transform: scale(1.08); }
+.hero-slide__noimg {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 200px; color: rgba(255,255,255,0.8); font-size: 3rem;
+}
+.hero-slide__badge {
+  position: absolute; top: 0.85rem; left: 0.85rem; z-index: 2;
+  font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: #fff; background: rgba(0,0,0,0.42); backdrop-filter: blur(4px);
+  padding: 0.3rem 0.65rem; border-radius: 999px; border: 1px solid rgba(255,255,255,0.35);
+}
+/* Compact buy button shown only on mobile, beneath each product image */
+.hero-slide__mbuy { display: none; }
+
+/* RIGHT: product info on glass.
+   justify-content:center with reserved-height children keeps the price row and
+   actions at the SAME vertical position on every slide, so the banner body no
+   longer grows/shrinks per product. */
+.hero-slide__body {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; justify-content: center;
+  gap: 0.55rem;
+  padding: 2rem 2.25rem 2rem 0.5rem;
+  color: #fff;
+  height: 100%;
+  overflow: hidden;
+}
+.hero-slide__eyebrow {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+  color: rgba(255,255,255,0.92); text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  width: max-content; max-width: 100%;
+}
+a.hero-slide__eyebrow:hover { text-decoration: underline; }
+.hero-slide__eyebrow-slot { min-height: 1rem; display: flex; align-items: center; }
+.hero-slide__title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(1.5rem, 2.6vw, 2.3rem);
+  line-height: 1.15; font-weight: 700; margin: 0.1rem 0 0.15rem;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.28);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  /* Reserve exactly 2 lines so 1-line and 2-line titles occupy the same space */
+  min-height: calc(2 * 1.15 * clamp(1.5rem, 2.6vw, 2.3rem));
+}
+.hero-slide__title a { color: #fff; }
+.hero-slide__title a:hover { color: #fff; opacity: 0.92; }
+.hero-slide__rating {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.82rem; color: rgba(255,255,255,0.95);
+  min-height: 1.2rem;
+}
+.hero-slide__rating .stars { color: #FFD66B; }
+.hero-slide__desc {
+  font-size: 0.95rem; line-height: 1.55; color: rgba(255,255,255,0.92);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  max-width: 38rem;
+  /* Reserve 2 lines so the price row never shifts up/down between products */
+  min-height: calc(2 * 1.55 * 0.95rem);
+}
+.hero-slide__pricerow {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.35rem;
+}
+.hero-slide__pricelabel {
+  font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: rgba(255,255,255,0.85); align-self: center;
+}
+.hero-slide__price {
+  font-family: 'Inter', sans-serif; font-weight: 800; font-size: 1.9rem; color: #fff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.hero-slide__price--check { font-size: 1.3rem; }
+.hero-slide__mrp { font-size: 0.95rem; color: rgba(255,255,255,0.75); text-decoration: line-through; }
+.hero-slide__off {
+  font-size: 0.72rem; font-weight: 700; color: #fff; background: rgba(16,185,129,0.9);
+  padding: 0.15rem 0.5rem; border-radius: 999px; align-self: center;
+}
+.hero-slide__actions { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-top: 0.9rem; }
+.hero-slide__buy { box-shadow: 0 12px 28px -10px rgba(0,0,0,0.45) !important; }
+.hero-slide__view {
+  background: rgba(255,255,255,0.16) !important;
+  border: 1px solid rgba(255,255,255,0.55) !important;
+  color: #fff !important;
+  backdrop-filter: blur(4px);
+}
+.hero-slide__view:hover { background: rgba(255,255,255,0.28) !important; }
+
+/* Arrows */
+.hero-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 5;
+  width: 2.7rem; height: 2.7rem; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.65); color: #1a1a1a;
+  border: 1px solid rgba(255,255,255,0.8);
+  backdrop-filter: blur(8px); box-shadow: 0 10px 24px -12px rgba(0,0,0,0.45);
+  cursor: pointer; transition: transform 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+}
+.hero-arrow:hover { background: #fff; transform: translateY(-50%) scale(1.08); }
+.hero-arrow:active { transform: translateY(-50%) scale(0.96); }
+.hero-arrow--prev { left: 1.9rem; }
+.hero-arrow--next { right: 1.9rem; }
+
+/* Bubbly dots — small + compact so they never cover product content */
+.hero-dots {
+  position: absolute; left: 50%; bottom: 0.7rem; transform: translateX(-50%); z-index: 5;
+  display: flex; align-items: center; gap: 0.38rem;
+  padding: 0.3rem 0.55rem; border-radius: 999px;
+  background: rgba(0,0,0,0.22); backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.25);
+}
+.hero-dot {
+  position: relative; width: 6px; height: 6px; border-radius: 999px;
+  background: rgba(255,255,255,0.5); border: none; cursor: pointer; padding: 0;
+  overflow: visible; transition: width 0.4s cubic-bezier(0.22,0.61,0.36,1), background 0.3s ease, transform 0.3s ease;
+}
+.hero-dot:hover { transform: scale(1.25); background: rgba(255,255,255,0.75); }
+.hero-dot__fill {
+  position: absolute; inset: 0; border-radius: 999px; background: #fff;
+  transform: scaleX(0); transform-origin: left center; opacity: 0;
+}
+/* Active dot stretches into a pill; the fill bar "fills" over autoplay duration */
+.hero-dot.is-active {
+  width: 20px; background: rgba(255,255,255,0.3);
+}
+.hero-dot.is-active .hero-dot__fill {
+  opacity: 1;
+  animation: hero-dot-fill var(--hero-autoplay, 6000ms) linear forwards;
+}
+@keyframes hero-dot-fill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+/* Bubbly pop when a dot becomes active */
+.hero-dot.is-active { animation: hero-dot-pop 0.45s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes hero-dot-pop {
+  0%   { transform: scale(0.6); }
+  60%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+/* tiny rising bubbles behind the dots for the "shopping site" feel */
+.hero-dots::before, .hero-dots::after {
+  content: ""; position: absolute; bottom: 100%; width: 6px; height: 6px; border-radius: 999px;
+  background: rgba(255,255,255,0.5); opacity: 0;
+  animation: hero-bubble 3.2s ease-in infinite;
+}
+.hero-dots::before { left: 22%; animation-delay: 0.4s; }
+.hero-dots::after  { right: 26%; animation-delay: 1.6s; width: 4px; height: 4px; }
+@keyframes hero-bubble {
+  0%   { transform: translateY(6px) scale(0.6); opacity: 0; }
+  30%  { opacity: 0.8; }
+  100% { transform: translateY(-28px) scale(1); opacity: 0; }
+}
+.hero-carousel.is-paused .hero-dot.is-active .hero-dot__fill { animation-play-state: paused; }
+
+/* ---- Responsive: stack image over info on small screens ---- */
+@media (max-width: 760px) {
+  /* MOBILE: show ONLY the product image + a small Buy button beneath it.
+     The full text body is hidden so the carousel reads like the image
+     sliders on Flipkart / Amazon mobile. */
+  .hero-carousel { padding: 0 0.75rem; }
+  .hero-slide__glass {
+    grid-template-columns: 1fr;
+    height: auto;            /* override desktop fixed height */
+    min-height: 0;
+    display: flex; flex-direction: column; align-items: stretch;
+    border-radius: 1.1rem;
+  }
+  .hero-slide__body { display: none; }
+  .hero-slide__media {
+    margin: 0.85rem; padding: 1.4rem 1.25rem 1.6rem;
+    display: flex; flex-direction: column; align-items: center; gap: 1rem;
+    border-radius: 1.1rem;
+    overflow: visible;        /* allow the buy button to sit naturally */
+  }
+  /* On mobile the image should fit naturally (contain) above the buy button */
+  .hero-slide__img {
+    width: auto; height: auto;
+    max-width: 100%; max-height: 210px;
+    object-fit: contain;
+  }
+  .hero-slide:hover .hero-slide__img { transform: none; }
+  .hero-slide__noimg { height: 160px; }
+  .hero-slide__mbuy {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
+    margin-top: 0.25rem;
+    font-size: 0.92rem; font-weight: 700; letter-spacing: 0.01em;
+    color: #fff; text-decoration: none;
+    padding: 0.7rem 1.9rem; border-radius: 999px;
+    background: linear-gradient(135deg, #ff7a18, #e6492d 55%, #c81d4a);
+    box-shadow: 0 10px 22px -10px rgba(200,29,74,0.8), inset 0 1px 0 rgba(255,255,255,0.4);
+    border: 1px solid rgba(255,255,255,0.35);
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
+  }
+  .hero-slide__mbuy:active { transform: scale(0.96); }
+  .hero-slide__mbuy--view {
+    background: rgba(255,255,255,0.92); color: #1a1a2e;
+    box-shadow: 0 8px 18px -10px rgba(0,0,0,0.5);
+  }
+  .hero-arrow { width: 2rem; height: 2rem; }
+  .hero-arrow--prev { left: 0.4rem; }
+  .hero-arrow--next { right: 0.4rem; }
+}
+
+/* respect reduced motion: stop the dot-fill + bubbles (slides still change on tap/arrow) */
+@media (prefers-reduced-motion: reduce) {
+  .hero-dot.is-active .hero-dot__fill { animation: none; }
+  .hero-dots::before, .hero-dots::after { animation: none; }
+  .hero-carousel__track { transition: none; }
+}
+
+/* ============================================================
+   PRODUCT CATALOGUE GRID
+   Desktop: 5 columns × 6 rows  ·  Mobile: 2 columns × 10 rows
+   Client-side pagination (app.js) hides all but the active page so
+   every page is an exact 5×6 / 2×10 block. Image fit is uniform via a
+   fixed square media box + object-contain.
+   ============================================================ */
+.catalogue__head { text-align: center; margin-bottom: 1.5rem; }
+.catalogue__title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(1.7rem, 3.4vw, 2.6rem);
+  line-height: 1.1; color: var(--ink, #2a2018);
+  margin: 0.35rem 0 0.5rem;
+}
+.catalogue__sub {
+  color: var(--ink-mute, #6b5e52); font-size: 0.98rem; max-width: 34rem;
+  margin: 0 auto; line-height: 1.55;
+}
+
+/* Flipkart-style sort bar */
+.cat-sort {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap;
+  padding: 0.75rem 0 1rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--line, #e7ddcb);
+}
+.cat-sort__count { font-size: 0.88rem; color: var(--ink-mute, #6b5e52); margin: 0; }
+.cat-sort__num { font-weight: 700; color: var(--ink, #2a2018); }
+.cat-sort__right { display: flex; align-items: center; gap: 0.6rem; }
+.cat-sort__label {
+  font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase;
+  font-weight: 700; color: var(--ink-faint, #b8a98f);
+}
+.cat-sort__select { position: relative; }
+.cat-sort__select select {
+  appearance: none; -webkit-appearance: none;
+  font-size: 0.86rem; font-weight: 600; color: var(--ink, #2a2018);
+  background: var(--surface, #fffdf7);
+  border: 1px solid var(--line, #e7ddcb);
+  border-radius: 0.6rem;
+  padding: 0.5rem 2.2rem 0.5rem 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.cat-sort__select select:hover { border-color: var(--accent, #9c3b35); }
+.cat-sort__select select:focus {
+  outline: none; border-color: var(--accent, #9c3b35);
+  box-shadow: 0 0 0 3px var(--accent-tint, rgba(156,59,53,0.12));
+}
+.cat-sort__caret {
+  position: absolute; right: 0.8rem; top: 50%; transform: translateY(-50%);
+  font-size: 0.7rem; color: var(--ink-faint, #b8a98f); pointer-events: none;
+}
+
+/* Default = mobile-first: 2 columns */
+.catalogue__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+/* Desktop = 5 columns */
+@media (min-width: 1024px) {
+  .catalogue__grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+}
+
+/* A catalogue card — hidden until JS assigns it to the active page */
+.cat-card {
+  display: flex; flex-direction: column;
+  background: var(--surface, #fffdf7);
+  border: 1px solid var(--line, #e7ddcb);
+  border-radius: 0.9rem;
+  overflow: hidden;
+  transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.cat-card.is-hidden { display: none !important; }
+.cat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 30px -20px rgba(80,50,20,0.45);
+  border-color: var(--accent, #9c3b35);
+}
+
+/* Square media box — every photo fits identically */
+.cat-card__media {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--panel, #f4ecdd);
+  overflow: hidden;
+}
+.cat-card__img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  padding: 0.85rem;
+  transition: transform 0.4s cubic-bezier(0.2,0.8,0.2,1);
+}
+.cat-card:hover .cat-card__img { transform: scale(1.06); }
+.cat-card__noimg {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-faint, #b8a98f); font-size: 1.8rem;
+}
+.cat-card__off {
+  position: absolute; bottom: 0.55rem; left: 0.55rem;
+  font-size: 0.66rem; font-weight: 700;
+  color: #fff; background: var(--accent, #9c3b35);
+  padding: 0.18rem 0.5rem; border-radius: 999px;
+}
+.cat-card__badge {
+  position: absolute; top: 0.55rem; right: 0.55rem;
+  font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink, #2a2018); background: rgba(255,255,255,0.9);
+  padding: 0.2rem 0.5rem; border-radius: 999px; border: 1px solid var(--line, #e7ddcb);
+}
+
+.cat-card__body {
+  display: flex; flex-direction: column; flex: 1;
+  padding: 0.7rem 0.7rem 0.75rem;
+}
+.cat-card__eyebrow {
+  font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-faint, #b8a98f); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 0.2rem;
+}
+.cat-card__title {
+  font-size: 0.85rem; line-height: 1.3; font-weight: 600;
+  color: var(--ink, #2a2018); margin: 0 0 0.55rem;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  min-height: calc(2 * 1.3 * 0.85rem);
+}
+.cat-card__title a { color: inherit; text-decoration: none; }
+.cat-card__title a:hover { color: var(--accent, #9c3b35); }
+.cat-card__foot {
+  margin-top: auto; display: flex; align-items: center; justify-content: space-between;
+  gap: 0.4rem; flex-wrap: wrap;
+}
+.cat-card__price { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+.cat-card__amt { font-weight: 700; font-size: 0.95rem; color: var(--ink, #2a2018); }
+.cat-card__amt--check { font-weight: 600; font-size: 0.78rem; color: var(--ink-mute, #6b5e52); }
+.cat-card__mrp { font-size: 0.7rem; text-decoration: line-through; color: var(--ink-faint, #b8a98f); }
+.cat-card__buy {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.74rem; font-weight: 700; color: #fff; text-decoration: none;
+  background: linear-gradient(135deg, #ff7a18, #e6492d 55%, #c81d4a);
+  padding: 0.4rem 0.75rem; border-radius: 999px;
+  box-shadow: 0 8px 16px -10px rgba(200,29,74,0.7);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.cat-card__buy:hover { filter: brightness(1.05); }
+.cat-card__buy:active { transform: scale(0.95); }
+.cat-card__buy--view {
+  background: var(--ink, #2a2018);
+  box-shadow: 0 8px 16px -10px rgba(0,0,0,0.5);
+}
+
+/* Numbered pagination */
+.catalogue__pager {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 0.4rem; margin-top: 2.25rem;
+}
+.catalogue__pager:empty { display: none; }
+.cat-page {
+  min-width: 2.4rem; height: 2.4rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 0.6rem;
+  font-size: 0.9rem; font-weight: 600;
+  color: var(--ink-soft, #4a3f33);
+  background: var(--surface, #fffdf7);
+  border: 1px solid var(--line, #e7ddcb);
+  border-radius: 0.55rem; cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cat-page:hover:not(:disabled) { border-color: var(--accent, #9c3b35); color: var(--accent, #9c3b35); }
+.cat-page.is-active {
+  background: var(--accent, #9c3b35); border-color: var(--accent, #9c3b35);
+  color: #fff; cursor: default;
+}
+.cat-page:disabled { opacity: 0.4; cursor: not-allowed; }
+.cat-page--ellipsis { border: none; background: transparent; cursor: default; min-width: 1.4rem; }
+.cat-page--nav { font-size: 0.8rem; }

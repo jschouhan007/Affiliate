@@ -56,15 +56,17 @@ function page(c: any, opts: {
 // ============================================================
 app.get('/', async (c) => {
   const db = c.env.DB
-  const [categories, featured, latestDeals, pillars, posts, hubs] = await Promise.all([
+  const [categories, featured, latestDeals, pillars, posts, hubs, carousel, catalogue] = await Promise.all([
     Q.getCategories(db),
     Q.getDeals(db, { featured: true, limit: 8 }),
     Q.getDeals(db, { limit: 8 }),
     Q.getPosts(db, { pillar: true, limit: 3 }),
     Q.getPosts(db, { limit: 3 }),
     Q.getHubs(db),
+    Q.getCarouselDeals(db),
+    Q.getCatalogueDeals(db),
   ])
-  const body = Pages.HomePage({ categories, featured, latestDeals, pillars, posts, hubs })
+  const body = Pages.HomePage({ categories, featured, latestDeals, pillars, posts, hubs, carousel, catalogue })
   return page(c, {
     title: SITE.name,
     canonical: '/',
@@ -81,7 +83,7 @@ app.get('/deals', async (c) => {
   const db = c.env.DB
   const [categories, deals] = await Promise.all([
     Q.getCategories(db),
-    Q.getDeals(db, { limit: 60 }),
+    Q.getDeals(db, { limit: 200 }),
   ])
   const body = Pages.DealsPage({
     deals,
@@ -109,7 +111,7 @@ app.get('/category/:slug', async (c) => {
   const category = await Q.getCategoryBySlug(db, slug)
   if (!category) return notFound(c, categories)
   const [deals, pillars] = await Promise.all([
-    Q.getDeals(db, { categoryId: category.id, limit: 60 }),
+    Q.getDeals(db, { categoryId: category.id, limit: 200 }),
     Q.getPosts(db, { categoryId: category.id, pillar: true, limit: 3 }),
   ])
   const body = Pages.CategoryPage({ category, deals, pillars })
@@ -571,6 +573,187 @@ app.post('/admin/duplicate/:id', async (c) => {
   const newId = await Q.duplicatePost(c.env.DB, id)
   if (!newId) return c.redirect('/admin?flash=' + encodeURIComponent('Could not duplicate post.'), 302)
   return c.redirect('/admin/edit/' + newId, 302)
+})
+
+// ============================================================
+// ADMIN — products (Deals) + offers/buy links
+// ============================================================
+function slugify(s: string): string {
+  return String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+// With parseBody({ all: true }) any key MAY come back as an array. For
+// single-value fields we always want the first scalar.
+function first(v: any): string {
+  if (Array.isArray(v)) return v.length ? String(v[0]) : ''
+  return v == null ? '' : String(v)
+}
+
+function parseDealBody(body: Record<string, any>): Q.DealInput {
+  const cat = parseInt(first(body.category_id), 10)
+  const rating = parseFloat(first(body.rating))
+  const rc = parseInt(first(body.rating_count), 10)
+  return {
+    slug: slugify(first(body.slug) || first(body.title)),
+    title: first(body.title).trim(),
+    brand: first(body.brand).trim(),
+    category_id: Number.isFinite(cat) ? cat : null,
+    image_url: first(body.image_url).trim(),
+    short_desc: first(body.short_desc).trim(),
+    description: first(body.description),
+    rating: Number.isFinite(rating) ? Math.max(0, Math.min(5, rating)) : null,
+    rating_count: Number.isFinite(rc) ? rc : 0,
+    pros: first(body.pros).trim(),
+    cons: first(body.cons).trim(),
+    featured: body.featured ? 1 : 0,
+    published: body.published ? 1 : 0,
+  }
+}
+
+// parseBody returns arrays for repeated field names; normalise to arrays.
+function asArray(v: any): any[] {
+  if (v == null) return []
+  return Array.isArray(v) ? v : [v]
+}
+
+function parseOffers(body: Record<string, any>): Q.OfferInput[] {
+  const retailers = asArray(body.offer_retailer)
+  const prices = asArray(body.offer_price)
+  const originals = asArray(body.offer_original)
+  const urls = asArray(body.offer_url)
+  // checkboxes only submit when checked, so we can't index them positionally
+  // reliably; default in_stock to 1 (sellable) unless price missing.
+  const offers: Q.OfferInput[] = []
+  const n = Math.max(retailers.length, prices.length, urls.length)
+  for (let i = 0; i < n; i++) {
+    const price = parseFloat(String(prices[i] || ''))
+    const original = parseFloat(String(originals[i] || ''))
+    const url = String(urls[i] || '').trim()
+    if (!url && !Number.isFinite(price)) continue
+    offers.push({
+      retailer: String(retailers[i] || 'other').trim().toLowerCase(),
+      price: Number.isFinite(price) ? price : null,
+      original_price: Number.isFinite(original) ? original : null,
+      currency: 'INR',
+      in_stock: 1,
+      buy_url: url || undefined,
+    })
+  }
+  return offers
+}
+
+// Products list
+app.get('/admin/products', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const deals = await Q.getAllDealsAdmin(c.env.DB)
+  const flash = c.req.query('flash') || undefined
+  return c.html(Admin.AdminProducts({ deals, flash }) as any)
+})
+
+// New product form
+app.get('/admin/products/new', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const categories = await Q.getCategories(c.env.DB)
+  return c.html(Admin.AdminProductEditor({ categories }) as any)
+})
+
+// Create product
+app.post('/admin/products/new', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const categories = await Q.getCategories(c.env.DB)
+  const raw = await c.req.parseBody({ all: true })
+  const input = parseDealBody(raw)
+  if (!input.title || !input.slug) {
+    c.status(400)
+    return c.html(Admin.AdminProductEditor({ categories, error: 'Product name and slug are required.' }) as any)
+  }
+  if (await Q.dealSlugExists(c.env.DB, input.slug)) {
+    c.status(400)
+    return c.html(Admin.AdminProductEditor({ categories, error: `Slug "${input.slug}" already exists. Choose another.` }) as any)
+  }
+  const id = await Q.createDeal(c.env.DB, input)
+  await Q.replaceOffers(c.env.DB, id, input.slug, parseOffers(raw))
+  return c.redirect('/admin/products?flash=' + encodeURIComponent('Product created.'), 302)
+})
+
+// Edit product form
+app.get('/admin/products/edit/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const id = parseInt(c.req.param('id'), 10)
+  const [deal, categories] = await Promise.all([Q.getDealById(c.env.DB, id), Q.getCategories(c.env.DB)])
+  if (!deal) return c.redirect('/admin/products?flash=' + encodeURIComponent('Product not found.'), 302)
+  return c.html(Admin.AdminProductEditor({ deal, categories }) as any)
+})
+
+// Update product
+app.post('/admin/products/edit/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const id = parseInt(c.req.param('id'), 10)
+  const categories = await Q.getCategories(c.env.DB)
+  const deal = await Q.getDealById(c.env.DB, id)
+  if (!deal) return c.redirect('/admin/products?flash=' + encodeURIComponent('Product not found.'), 302)
+  const raw = await c.req.parseBody({ all: true })
+  const input = parseDealBody(raw)
+  if (!input.title || !input.slug) {
+    c.status(400)
+    return c.html(Admin.AdminProductEditor({ deal: { ...deal, ...input } as any, categories, error: 'Product name and slug are required.' }) as any)
+  }
+  if (await Q.dealSlugExists(c.env.DB, input.slug, id)) {
+    c.status(400)
+    return c.html(Admin.AdminProductEditor({ deal: { ...deal, ...input } as any, categories, error: `Slug "${input.slug}" is used by another product.` }) as any)
+  }
+  await Q.updateDeal(c.env.DB, id, input)
+  await Q.replaceOffers(c.env.DB, id, input.slug, parseOffers(raw))
+  return c.redirect('/admin/products?flash=' + encodeURIComponent('Product updated.'), 302)
+})
+
+// Delete product
+app.post('/admin/products/delete/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const id = parseInt(c.req.param('id'), 10)
+  await Q.deleteDeal(c.env.DB, id)
+  return c.redirect('/admin/products?flash=' + encodeURIComponent('Product deleted.'), 302)
+})
+
+// Toggle publish
+app.post('/admin/products/toggle/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const id = parseInt(c.req.param('id'), 10)
+  const deal = await Q.getDealById(c.env.DB, id)
+  if (!deal) return c.redirect('/admin/products?flash=' + encodeURIComponent('Product not found.'), 302)
+  await Q.setDealPublished(c.env.DB, id, deal.published ? 0 : 1)
+  return c.redirect('/admin/products?flash=' + encodeURIComponent(deal.published ? 'Product hidden (draft).' : 'Product is now live.'), 302)
+})
+
+// Toggle featured
+app.post('/admin/products/feature/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const id = parseInt(c.req.param('id'), 10)
+  const deal = await Q.getDealById(c.env.DB, id)
+  if (!deal) return c.redirect('/admin/products?flash=' + encodeURIComponent('Product not found.'), 302)
+  await Q.setDealFeatured(c.env.DB, id, deal.featured ? 0 : 1)
+  return c.redirect('/admin/products?flash=' + encodeURIComponent(deal.featured ? 'Removed from featured.' : 'Marked as featured.'), 302)
+})
+
+// ============================================================
+// ADMIN — hero carousel selection
+// ============================================================
+app.get('/admin/carousel', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const [deals, selectedIds] = await Promise.all([Q.getAllDealsAdmin(c.env.DB), Q.getCarouselIds(c.env.DB)])
+  const flash = c.req.query('flash') || undefined
+  return c.html(Admin.AdminCarousel({ deals, selectedIds, flash }) as any)
+})
+
+app.post('/admin/carousel', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const body = await c.req.parseBody()
+  const ids = String(body.ids || '')
+    .split(',')
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => Number.isInteger(n))
+  await Q.setCarouselIds(c.env.DB, ids)
+  return c.redirect('/admin/carousel?flash=' + encodeURIComponent(`Carousel saved — ${Math.min(ids.length, 8)} product(s).`), 302)
 })
 
 // ============================================================

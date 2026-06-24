@@ -28,6 +28,7 @@ export interface Offer {
   retailer: string
   affiliate_link_id?: number
   affiliate_slug?: string
+  dest_url?: string
   price?: number
   original_price?: number
   currency: string

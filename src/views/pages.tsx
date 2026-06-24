@@ -18,6 +18,8 @@ import {
   Byline,
   TestedBadge,
   stars,
+  HeroCarousel,
+  CatalogueGrid,
 } from './components'
 
 // ============================================================
@@ -30,8 +32,10 @@ export function HomePage(data: {
   pillars: Post[]
   posts: Post[]
   hubs?: Hub[]
+  carousel?: Deal[]
+  catalogue?: Deal[]
 }): string {
-  const { categories, featured, latestDeals, pillars, posts, hubs = [] } = data
+  const { categories, featured, latestDeals, pillars, posts, hubs = [], carousel = [], catalogue = [] } = data
   const lead = featured[0]
   const secondary = featured.slice(1, 4)
   const restFeatured = featured.slice(4, 8)
@@ -46,16 +50,13 @@ export function HomePage(data: {
     .join('<span class="text-line">·</span>')
 
   return `
-  <!-- HERO: asymmetric 60/40 editorial split -->
-  <section class="max-w-editorial mx-auto px-5 pt-16 md:pt-24 pb-16">
-    <div class="max-w-3xl">
-      <div class="eyebrow mb-5 flex items-center gap-3 fade-up"><span class="kicker-rule"></span>Independent reviews &amp; tested recommendations</div>
-      <h1 class="font-serif text-[2.6rem] md:text-[4.2rem] leading-[1.04] text-ink fade-up">We test it first.<br/>Then we tell you the <em class="text-accent not-italic font-normal italic">truth</em>.</h1>
-      <p class="mt-7 text-lg md:text-xl text-ink-soft leading-relaxed max-w-2xl fade-up">No hype, no padded discounts. Just carefully researched picks across mobiles, tech, appliances and home — paired with the genuine best price from Amazon, Flipkart and beyond.</p>
-      <div class="mt-9 flex flex-wrap items-center gap-4 fade-up">
-        <a href="/guides" class="btn btn-primary">Browse Buying Guides <i class="fas fa-arrow-right text-xs"></i></a>
-        <a href="/deals" class="btn btn-ghost">See all deals</a>
-      </div>
+  <!-- HERO: featured product carousel is the very first thing on the page -->
+  ${carousel.length ? `<div class="pt-6 md:pt-8">${HeroCarousel(carousel, '/')}</div>` : ''}
+
+  <section class="max-w-editorial mx-auto px-5 pt-8 pb-12">
+    <div class="flex flex-wrap items-center gap-4">
+      <a href="/guides" class="btn btn-primary">Browse Buying Guides <i class="fas fa-arrow-right text-xs"></i></a>
+      <a href="/deals" class="btn btn-ghost">See all deals</a>
     </div>
   </section>
 
@@ -67,6 +68,9 @@ export function HomePage(data: {
       ${catRow}
     </div>
   </div>
+
+  <!-- Product catalogue: 5×4 desktop / 2×8 mobile, sort + numbered pagination -->
+  ${CatalogueGrid(catalogue, '/', { heading: true, eyebrow: 'The Edit', title: 'Shop the catalogue', subtitle: 'Fashion first, then everything else we love — browse the full collection.' })}
 
   <div class="max-w-editorial mx-auto px-5">
     ${lead ? `
@@ -154,75 +158,34 @@ export function HomePage(data: {
 // DEALS LISTING
 // ============================================================
 export function DealsPage(data: { deals: Deal[]; title: string; subtitle?: string; crumbs: { name: string; url?: string }[]; faceted?: boolean }): string {
-  const { deals, faceted = true } = data
-  if (!faceted) {
-    return `<div class="max-w-editorial mx-auto px-5 py-16">
-      ${Breadcrumbs(data.crumbs)}
-      <header class="max-w-2xl mb-14">
-        <div class="eyebrow mb-4 flex items-center gap-3"><span class="kicker-rule"></span>The collection</div>
-        <h1 class="font-serif text-4xl md:text-5xl text-ink leading-tight">${data.title}</h1>
-        ${data.subtitle ? `<p class="mt-5 text-lg text-ink-soft leading-relaxed">${data.subtitle}</p>` : ''}
-      </header>
-      ${DealGrid(deals, false, undefined, true)}
-    </div>`
-  }
-  return `<div class="max-w-editorial mx-auto px-5 py-16" id="facet-page">
+  const { deals } = data
+  // Unified clean layout: slim title + sortable, paginated catalogue grid.
+  return `<div class="max-w-editorial mx-auto px-5 pt-10 pb-2">
     ${Breadcrumbs(data.crumbs)}
-    <header class="max-w-2xl mb-12">
-      <div class="eyebrow mb-4 flex items-center gap-3"><span class="kicker-rule"></span>The collection</div>
+    <header class="text-center mb-2">
+      <div class="eyebrow eyebrow-mute mb-2 flex items-center justify-center gap-2"><span class="kicker-rule"></span>The collection</div>
       <h1 class="font-serif text-4xl md:text-5xl text-ink leading-tight">${data.title}</h1>
-      ${data.subtitle ? `<p class="mt-5 text-lg text-ink-soft leading-relaxed">${data.subtitle}</p>` : ''}
+      ${data.subtitle ? `<p class="mt-4 text-base text-ink-soft leading-relaxed max-w-2xl mx-auto">${data.subtitle}</p>` : ''}
     </header>
-    <div class="grid lg:grid-cols-[260px_1fr] gap-10">
-      ${FacetSidebar(deals)}
-      <div>
-        <div class="flex items-center justify-between mb-6 pb-4 border-b border-line">
-          <p class="text-sm text-ink-mute"><span id="facet-count" class="font-semibold text-ink">${deals.length}</span> product${deals.length === 1 ? '' : 's'}</p>
-          <button type="button" id="facet-toggle-mobile" class="lg:hidden btn btn-line btn-sm"><i class="fas fa-sliders"></i> Filters</button>
-        </div>
-        <div id="facet-results">${DealGrid(deals, false, undefined, true)}</div>
-        <div id="facet-empty" class="is-hidden text-center py-20 text-ink-faint">
-          <i class="fas fa-filter-circle-xmark text-3xl mb-3"></i>
-          <p class="mb-4">No products match these filters.</p>
-          <button type="button" id="facet-reset-2" class="btn btn-line btn-sm">Clear filters</button>
-        </div>
-      </div>
-    </div>
-  </div>`
+  </div>
+  ${CatalogueGrid(deals, '/deals')}`
 }
 
 // ============================================================
 // CATEGORY
 // ============================================================
 export function CategoryPage(data: { category: Category; deals: Deal[]; pillars: Post[] }): string {
-  const { category, deals, pillars } = data
-  return `<div class="max-w-editorial mx-auto px-5 py-16">
+  const { category, deals } = data
+  // Clean category page: a slim title, then ONLY the sortable + paginated
+  // catalogue grid. No guide cards, no facet sidebar, no extra intro blocks.
+  return `<div class="max-w-editorial mx-auto px-5 pt-10 pb-2">
     ${Breadcrumbs([{ name: 'Home', url: '/' }, { name: 'Categories', url: '/deals' }, { name: category.name }])}
-    <header class="max-w-2xl mb-14">
-      <div class="eyebrow mb-4 flex items-center gap-3"><span class="kicker-rule"></span><i class="${category.icon || 'fas fa-tag'}"></i> Category</div>
+    <header class="text-center mb-2">
+      <div class="eyebrow eyebrow-mute mb-2 flex items-center justify-center gap-2"><i class="${category.icon || 'fas fa-tag'}"></i> Category</div>
       <h1 class="font-serif text-4xl md:text-5xl text-ink leading-tight">${category.name}</h1>
-      <p class="mt-5 text-lg text-ink-soft leading-relaxed">${category.description || `Our tested ${category.name.toLowerCase()} recommendations, with the best current prices.`}</p>
     </header>
-    ${pillars.length ? `<section class="mb-20">
-      ${SectionHeader(`Guides for ${category.name.toLowerCase()}`, 'Start here')}
-      <div class="grid md:grid-cols-3 gap-8">${pillars.map(PostCard).join('')}</div>
-    </section>` : ''}
-    ${SectionHeader('Every pick', 'The list')}
-    <div class="grid lg:grid-cols-[260px_1fr] gap-10" id="facet-page">
-      ${FacetSidebar(deals)}
-      <div>
-        <div class="flex items-center justify-between mb-6 pb-4 border-b border-line">
-          <p class="text-sm text-ink-mute"><span id="facet-count" class="font-semibold text-ink">${deals.length}</span> product${deals.length === 1 ? '' : 's'}</p>
-        </div>
-        <div id="facet-results">${DealGrid(deals, false, undefined, true)}</div>
-        <div id="facet-empty" class="is-hidden text-center py-20 text-ink-faint">
-          <i class="fas fa-filter-circle-xmark text-3xl mb-3"></i>
-          <p class="mb-4">No products match these filters.</p>
-          <button type="button" id="facet-reset-2" class="btn btn-line btn-sm">Clear filters</button>
-        </div>
-      </div>
-    </div>
-  </div>`
+  </div>
+  ${CatalogueGrid(deals, `/category/${category.slug}`)}`
 }
 
 // ============================================================
