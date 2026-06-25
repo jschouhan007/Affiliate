@@ -469,17 +469,17 @@ export function SearchPage(data: { q: string; deals: Deal[]; posts: Post[] }): s
   const total = deals.length + posts.length
   // escape user-supplied query before reflecting it into HTML (prevents XSS)
   const safeQ = String(q).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string))
-  return `<div class="max-w-editorial mx-auto px-5 py-16">
+  return `<div class="max-w-editorial mx-auto px-5 pt-10 pb-2">
     ${Breadcrumbs([{ name: 'Home', url: '/' }, { name: 'Search' }])}
-    <header class="mb-14">
-      <div class="eyebrow mb-3">Search</div>
+    <header class="text-center mb-2">
+      <div class="eyebrow eyebrow-mute mb-2">Search</div>
       <h1 class="font-serif text-4xl text-ink break-words">Results for "${safeQ}"</h1>
-      <p class="mt-3 text-ink-mute">${total} result${total === 1 ? '' : 's'} found.</p>
+      <p class="mt-2 text-ink-mute">${total} result${total === 1 ? '' : 's'} found.</p>
     </header>
-    ${deals.length ? `<section class="mb-20">${SectionHeader('Products', 'Reviews')}${DealGrid(deals)}</section>` : ''}
-    ${posts.length ? `<section>${SectionHeader('Articles', 'Reading')}<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">${posts.map(PostCard).join('')}</div></section>` : ''}
-    ${!total ? `<div class="text-center py-24 text-ink-faint"><i class="fas fa-magnifying-glass text-3xl mb-4"></i><p>Nothing matched. Try another term.</p></div>` : ''}
-  </div>`
+  </div>
+  ${deals.length ? CatalogueGrid(deals, `/search?q=${encodeURIComponent(q)}`) : ''}
+  ${posts.length ? `<div class="max-w-editorial mx-auto px-5 py-12"><section>${SectionHeader('Articles', 'Reading')}<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">${posts.map(PostCard).join('')}</div></section></div>` : ''}
+  ${!total ? `<div class="max-w-editorial mx-auto px-5 text-center py-24 text-ink-faint"><i class="fas fa-magnifying-glass text-3xl mb-4"></i><p>Nothing matched. Try another term.</p></div>` : ''}`
 }
 
 // ============================================================

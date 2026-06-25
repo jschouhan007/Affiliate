@@ -385,12 +385,13 @@
   })();
 
   // ============================================================
-  // PRODUCT CATALOGUE — client-side numbered pagination
+  // PRODUCT CATALOGUE — filter → sort → paginate (instant, client-side)
   // Desktop (>=1024px): 20 per page (5 cols × 4 rows)
   // Mobile  (<1024px) : 16 per page (2 cols × 8 rows)
-  // Re-paginates on resize when the breakpoint is crossed so each page
-  // is always an exact 5×4 / 2×8 block.
-  // Flipkart-style Sort By reorders the cards in the DOM, then re-paginates.
+  // Filters (price range, rating, availability, category, brand, features)
+  // live on the LEFT. Sort By + grid + numbered pagination on the right.
+  // Pipeline: filter the master list → sort the survivors → paginate the
+  // result so every page is an exact 5×4 / 2×8 block of matching products.
   // ============================================================
   (function () {
     var section = document.getElementById('catalogue');
@@ -398,11 +399,14 @@
     var pager = document.getElementById('catalogue-pager');
     if (!section || !grid || !pager) return;
 
-    var cards = Array.prototype.slice.call(grid.querySelectorAll('.cat-card'));
-    if (!cards.length) return;
+    var allCards = Array.prototype.slice.call(grid.querySelectorAll('.cat-card'));
+    if (!allCards.length) return;
+    allCards.forEach(function (c, i) { c.__order = i; });
 
-    // Remember the original (server) order so "Relevance" can be restored.
-    cards.forEach(function (c, i) { c.__order = i; });
+    var filters = document.getElementById('catalogue-filters');
+    var emptyEl = document.getElementById('catalogue-empty');
+    var countEl = document.getElementById('catalogue-count');
+    var countWord = document.getElementById('catalogue-count-word');
 
     var perDesktop = parseInt(section.getAttribute('data-per-desktop'), 10) || 20;
     var perMobile = parseInt(section.getAttribute('data-per-mobile'), 10) || 16;
@@ -410,6 +414,7 @@
 
     var current = 1;
     var perPage = DESKTOP_MQ.matches ? perDesktop : perMobile;
+    var visible = allCards.slice();   // cards passing the current filters, in sort order
 
     function num(card, attr) {
       var v = card.getAttribute(attr);
@@ -417,55 +422,164 @@
       var n = parseFloat(v);
       return isNaN(n) ? NaN : n;
     }
+    function rupee(n) { return '₹' + Number(n).toLocaleString('en-IN'); }
 
-    // ---- Sort By ----
-    var sortSel = document.getElementById('catalogue-sort');
-    function applySort(mode) {
-      var sorted = cards.slice();
-      var BIG = Number.MAX_SAFE_INTEGER;
-      function price(c) { var n = num(c, 'data-price'); return isNaN(n) ? null : n; }
-      if (mode === 'price-asc') {
-        sorted.sort(function (a, b) {
-          var pa = price(a), pb = price(b);
-          if (pa === null && pb === null) return a.__order - b.__order;
-          if (pa === null) return 1;            // no-price sinks to bottom
-          if (pb === null) return -1;
-          return pa - pb || a.__order - b.__order;
-        });
-      } else if (mode === 'price-desc') {
-        sorted.sort(function (a, b) {
-          var pa = price(a), pb = price(b);
-          if (pa === null && pb === null) return a.__order - b.__order;
-          if (pa === null) return 1;
-          if (pb === null) return -1;
-          return pb - pa || a.__order - b.__order;
-        });
-      } else if (mode === 'latest') {
-        sorted.sort(function (a, b) { return (num(b, 'data-date') || 0) - (num(a, 'data-date') || 0) || a.__order - b.__order; });
-      } else if (mode === 'oldest') {
-        sorted.sort(function (a, b) { return (num(a, 'data-date') || 0) - (num(b, 'data-date') || 0) || a.__order - b.__order; });
-      } else if (mode === 'popularity') {
-        sorted.sort(function (a, b) { return (num(b, 'data-pop') || 0) - (num(a, 'data-pop') || 0) || a.__order - b.__order; });
-      } else if (mode === 'discount') {
-        sorted.sort(function (a, b) { return (num(b, 'data-disc') || 0) - (num(a, 'data-disc') || 0) || a.__order - b.__order; });
-      } else {
-        // relevance — restore original order
-        sorted.sort(function (a, b) { return a.__order - b.__order; });
+    // ---------- FILTERING ----------
+    var fMin = filters && parseFloat(filters.getAttribute('data-min')) || 0;
+    var fMax = filters && parseFloat(filters.getAttribute('data-max')) || Infinity;
+
+    var priceMin = document.getElementById('cat-price-min');
+    var priceMax = document.getElementById('cat-price-max');
+    var priceMinVal = document.getElementById('cat-price-min-val');
+    var priceMaxVal = document.getElementById('cat-price-max-val');
+    var rangeFill = document.getElementById('cat-range-fill');
+
+    function syncRangeFill() {
+      if (!priceMin || !priceMax || !rangeFill) return;
+      var lo = parseFloat(priceMin.value), hi = parseFloat(priceMax.value);
+      var span = (fMax - fMin) || 1;
+      var l = ((lo - fMin) / span) * 100;
+      var r = ((hi - fMin) / span) * 100;
+      rangeFill.style.left = l + '%';
+      rangeFill.style.right = (100 - r) + '%';
+    }
+    function clampRange(changed) {
+      if (!priceMin || !priceMax) return;
+      var lo = parseFloat(priceMin.value), hi = parseFloat(priceMax.value);
+      var gap = ((fMax - fMin) || 1) * 0.02;     // keep a small gap
+      if (lo > hi - gap) {
+        if (changed === 'min') priceMin.value = Math.max(fMin, hi - gap);
+        else priceMax.value = Math.min(fMax, lo + gap);
       }
-      // Re-append in the new order (DocumentFragment = single reflow)
-      var frag = document.createDocumentFragment();
-      sorted.forEach(function (c) { frag.appendChild(c); });
-      grid.appendChild(frag);
-      cards = sorted;
-      showPage(1);
-    }
-    if (sortSel) {
-      sortSel.addEventListener('change', function () { applySort(sortSel.value); });
+      if (priceMinVal) priceMinVal.textContent = rupee(priceMin.value);
+      if (priceMaxVal) priceMaxVal.textContent = rupee(priceMax.value);
+      syncRangeFill();
     }
 
-    function pageCount() {
-      return Math.max(1, Math.ceil(cards.length / perPage));
+    function activeChecked(cls) {
+      if (!filters) return [];
+      return Array.prototype.slice.call(filters.querySelectorAll(cls + ':checked')).map(function (c) { return c.value; });
     }
+    function activeFeatures() {
+      if (!filters) return [];
+      return Array.prototype.slice.call(filters.querySelectorAll('.cat-feature.is-active')).map(function (c) { return c.getAttribute('data-feature'); });
+    }
+    function activeRating() {
+      if (!filters) return 0;
+      var r = filters.querySelector('input[name="cat-rating"]:checked');
+      return r ? parseFloat(r.value) : 0;
+    }
+
+    function passesFilters(card) {
+      // price range
+      if (priceMin && priceMax) {
+        var lo = parseFloat(priceMin.value), hi = parseFloat(priceMax.value);
+        var p = num(card, 'data-price');
+        if (!isNaN(p)) { if (p < lo || p > hi) return false; }
+      }
+      // rating
+      var minR = activeRating();
+      if (minR && (num(card, 'data-rating') || 0) < minR) return false;
+      // availability toggles
+      var inStock = document.getElementById('cat-instock');
+      if (inStock && inStock.checked && card.getAttribute('data-stock') !== '1') return false;
+      var buyable = document.getElementById('cat-buyable');
+      if (buyable && buyable.checked && card.getAttribute('data-buyable') !== '1') return false;
+      var dealOnly = document.getElementById('cat-deal');
+      if (dealOnly && dealOnly.checked && (num(card, 'data-disc') || 0) <= 0) return false;
+      // category
+      var cats = activeChecked('.cat-cat');
+      if (cats.length && cats.indexOf(card.getAttribute('data-category') || '') === -1) return false;
+      // brand
+      var brands = activeChecked('.cat-brand');
+      if (brands.length && brands.indexOf(card.getAttribute('data-brand') || '') === -1) return false;
+      // features (must have ALL selected)
+      var feats = activeFeatures();
+      if (feats.length) {
+        var cardFeats = (card.getAttribute('data-features') || '').split(',').map(function (s) { return s.trim(); });
+        for (var i = 0; i < feats.length; i++) { if (cardFeats.indexOf(feats[i]) === -1) return false; }
+      }
+      return true;
+    }
+
+    function countActiveFilters() {
+      var n = 0;
+      if (priceMin && priceMax && (parseFloat(priceMin.value) > fMin || parseFloat(priceMax.value) < fMax)) n++;
+      if (activeRating()) n++;
+      ['cat-instock', 'cat-buyable', 'cat-deal'].forEach(function (id) { var el = document.getElementById(id); if (el && el.checked) n++; });
+      n += activeChecked('.cat-cat').length;
+      n += activeChecked('.cat-brand').length;
+      n += activeFeatures().length;
+      return n;
+    }
+
+    // ---------- SORTING ----------
+    var sortSel = document.getElementById('catalogue-sort');
+    function sortCards(arr) {
+      var mode = sortSel ? sortSel.value : 'relevance';
+      function price(c) { var n = num(c, 'data-price'); return isNaN(n) ? null : n; }
+      var s = arr.slice();
+      if (mode === 'price-asc') s.sort(function (a, b) { var pa = price(a), pb = price(b); if (pa === null && pb === null) return a.__order - b.__order; if (pa === null) return 1; if (pb === null) return -1; return pa - pb || a.__order - b.__order; });
+      else if (mode === 'price-desc') s.sort(function (a, b) { var pa = price(a), pb = price(b); if (pa === null && pb === null) return a.__order - b.__order; if (pa === null) return 1; if (pb === null) return -1; return pb - pa || a.__order - b.__order; });
+      else if (mode === 'latest') s.sort(function (a, b) { return (num(b, 'data-date') || 0) - (num(a, 'data-date') || 0) || a.__order - b.__order; });
+      else if (mode === 'oldest') s.sort(function (a, b) { return (num(a, 'data-date') || 0) - (num(b, 'data-date') || 0) || a.__order - b.__order; });
+      else if (mode === 'popularity') s.sort(function (a, b) { return (num(b, 'data-pop') || 0) - (num(a, 'data-pop') || 0) || a.__order - b.__order; });
+      else if (mode === 'discount') s.sort(function (a, b) { return (num(b, 'data-disc') || 0) - (num(a, 'data-disc') || 0) || a.__order - b.__order; });
+      else if (mode === 'rating') s.sort(function (a, b) { return (num(b, 'data-rating') || 0) - (num(a, 'data-rating') || 0) || a.__order - b.__order; });
+      else s.sort(function (a, b) { return a.__order - b.__order; });
+      return s;
+    }
+
+    // ---------- ACTIVE FILTER CHIPS ----------
+    var activeWrap = document.getElementById('cat-active-chips');
+    var activeCountBadge = document.getElementById('cat-active-count');
+    function renderActiveChips() {
+      var n = countActiveFilters();
+      if (activeCountBadge) { activeCountBadge.hidden = n === 0; activeCountBadge.textContent = n; }
+      if (!activeWrap) return;
+      var chips = [];
+      if (priceMin && priceMax && (parseFloat(priceMin.value) > fMin || parseFloat(priceMax.value) < fMax)) {
+        chips.push({ label: rupee(priceMin.value) + ' – ' + rupee(priceMax.value), clear: function () { priceMin.value = fMin; priceMax.value = fMax; clampRange(); } });
+      }
+      var r = activeRating();
+      if (r) chips.push({ label: r + '★ & up', clear: function () { var el = filters.querySelector('input[name="cat-rating"]:checked'); if (el) el.checked = false; } });
+      [['cat-instock', 'In stock'], ['cat-buyable', 'Buy-now'], ['cat-deal', 'On offer']].forEach(function (pair) {
+        var el = document.getElementById(pair[0]); if (el && el.checked) chips.push({ label: pair[1], clear: function () { el.checked = false; } });
+      });
+      Array.prototype.slice.call(filters.querySelectorAll('.cat-cat:checked')).forEach(function (el) { chips.push({ label: el.parentElement.textContent.trim(), clear: function () { el.checked = false; } }); });
+      Array.prototype.slice.call(filters.querySelectorAll('.cat-brand:checked')).forEach(function (el) { chips.push({ label: el.parentElement.textContent.trim(), clear: function () { el.checked = false; } }); });
+      Array.prototype.slice.call(filters.querySelectorAll('.cat-feature.is-active')).forEach(function (el) { chips.push({ label: el.getAttribute('data-feature'), clear: function () { el.classList.remove('is-active'); } }); });
+
+      activeWrap.hidden = chips.length === 0;
+      activeWrap.innerHTML = '';
+      chips.forEach(function (chip) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'cat-activechip';
+        b.innerHTML = chip.label + ' <i class="fas fa-xmark"></i>';
+        b.addEventListener('click', function () { chip.clear(); refresh(); });
+        activeWrap.appendChild(b);
+      });
+    }
+
+    // ---------- PIPELINE ----------
+    function refresh(resetPage) {
+      visible = sortCards(allCards.filter(passesFilters));
+      // reorder DOM to the sorted/filtered order, hide the rest
+      var frag = document.createDocumentFragment();
+      visible.forEach(function (c) { frag.appendChild(c); });
+      // append filtered-out cards after so they stay in DOM but hidden
+      allCards.forEach(function (c) { if (visible.indexOf(c) === -1) frag.appendChild(c); });
+      grid.appendChild(frag);
+
+      if (countEl) countEl.textContent = visible.length;
+      if (countWord) countWord.textContent = visible.length === 1 ? 'product' : 'products';
+      if (emptyEl) emptyEl.classList.toggle('is-hidden', visible.length !== 0);
+      grid.classList.toggle('is-hidden', visible.length === 0);
+      renderActiveChips();
+      showPage(resetPage === false ? current : 1);
+    }
+
+    function pageCount() { return Math.max(1, Math.ceil(visible.length / perPage)); }
 
     function showPage(page) {
       var total = pageCount();
@@ -474,10 +588,9 @@
       current = page;
       var startIdx = (page - 1) * perPage;
       var endIdx = startIdx + perPage;
-      for (var i = 0; i < cards.length; i++) {
-        if (i >= startIdx && i < endIdx) cards[i].classList.remove('is-hidden');
-        else cards[i].classList.add('is-hidden');
-      }
+      // hide everything first
+      allCards.forEach(function (c) { c.classList.add('is-hidden'); });
+      for (var i = startIdx; i < endIdx && i < visible.length; i++) visible[i].classList.remove('is-hidden');
       renderPager();
     }
 
@@ -488,62 +601,96 @@
       b.className = 'cat-page' + (opts.nav ? ' cat-page--nav' : '') + (opts.active ? ' is-active' : '');
       b.innerHTML = label;
       if (opts.active) b.setAttribute('aria-current', 'page');
-      if (opts.disabled) { b.disabled = true; }
-      else {
-        b.addEventListener('click', function () {
-          showPage(page);
-          // scroll the top of the catalogue (heading or sort bar) into view
-          var anchor = section.querySelector('.catalogue__head') || section.querySelector('.cat-sort') || section;
-          if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-      }
+      if (opts.disabled) b.disabled = true;
+      else b.addEventListener('click', function () {
+        showPage(page);
+        var anchor = section.querySelector('.catalogue__head') || section.querySelector('.cat-sort') || section;
+        if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
       return b;
     }
-
-    function ellipsis() {
-      var s = document.createElement('span');
-      s.className = 'cat-page cat-page--ellipsis';
-      s.textContent = '…';
-      return s;
-    }
+    function ellipsis() { var s = document.createElement('span'); s.className = 'cat-page cat-page--ellipsis'; s.textContent = '…'; return s; }
 
     function renderPager() {
       var total = pageCount();
       pager.innerHTML = '';
       if (total <= 1) return;
-
       pager.appendChild(makeBtn('<i class="fas fa-chevron-left"></i>', current - 1, { nav: true, disabled: current === 1 }));
-
-      // Build a windowed page list: 1 … (c-1) c (c+1) … last
-      var pages = [];
-      var i;
+      var pages = [], i;
       for (i = 1; i <= total; i++) {
-        if (i === 1 || i === total || (i >= current - 1 && i <= current + 1)) {
-          pages.push(i);
-        } else if (pages[pages.length - 1] !== '...') {
-          pages.push('...');
-        }
+        if (i === 1 || i === total || (i >= current - 1 && i <= current + 1)) pages.push(i);
+        else if (pages[pages.length - 1] !== '...') pages.push('...');
       }
       for (i = 0; i < pages.length; i++) {
         if (pages[i] === '...') pager.appendChild(ellipsis());
         else pager.appendChild(makeBtn(String(pages[i]), pages[i], { active: pages[i] === current }));
       }
-
       pager.appendChild(makeBtn('<i class="fas fa-chevron-right"></i>', current + 1, { nav: true, disabled: current === total }));
     }
 
+    // ---------- EVENTS ----------
+    if (sortSel) sortSel.addEventListener('change', function () { refresh(); });
+
+    if (priceMin) priceMin.addEventListener('input', function () { clampRange('min'); refresh(); });
+    if (priceMax) priceMax.addEventListener('input', function () { clampRange('max'); refresh(); });
+
+    if (filters) {
+      filters.addEventListener('change', function (e) {
+        if (e.target.matches('.cat-brand, .cat-cat, input[name="cat-rating"], #cat-instock, #cat-buyable, #cat-deal')) refresh();
+      });
+      filters.addEventListener('click', function (e) {
+        var chip = e.target.closest('.cat-feature');
+        if (chip) { chip.classList.toggle('is-active'); refresh(); }
+      });
+    }
+
+    // brand search box
+    var brandSearch = document.getElementById('cat-brand-search');
+    if (brandSearch) {
+      brandSearch.addEventListener('input', function () {
+        var q = brandSearch.value.toLowerCase();
+        Array.prototype.slice.call(document.querySelectorAll('#cat-brand-list .cat-filter__opt')).forEach(function (opt) {
+          opt.style.display = opt.textContent.toLowerCase().indexOf(q) === -1 ? 'none' : '';
+        });
+      });
+    }
+
+    function reset() {
+      if (priceMin) priceMin.value = fMin;
+      if (priceMax) priceMax.value = fMax;
+      clampRange();
+      if (filters) {
+        filters.querySelectorAll('input[type="checkbox"]').forEach(function (c) { c.checked = false; });
+        filters.querySelectorAll('input[name="cat-rating"]').forEach(function (r) { r.checked = false; });
+        filters.querySelectorAll('.cat-feature.is-active').forEach(function (c) { c.classList.remove('is-active'); });
+      }
+      if (sortSel) sortSel.value = 'relevance';
+      refresh();
+    }
+    ['cat-reset', 'cat-reset-2'].forEach(function (id) { var b = document.getElementById(id); if (b) b.addEventListener('click', reset); });
+
+    // mobile filter drawer
+    var openBtn = document.getElementById('cat-filter-open');
+    var closeBtn = document.getElementById('cat-filter-close');
+    var backdrop = document.getElementById('cat-filters-backdrop');
+    function openFilters() { if (filters) filters.classList.add('is-open'); if (backdrop) backdrop.hidden = false; document.body.style.overflow = 'hidden'; }
+    function closeFilters() { if (filters) filters.classList.remove('is-open'); if (backdrop) backdrop.hidden = true; document.body.style.overflow = ''; }
+    if (openBtn) openBtn.addEventListener('click', openFilters);
+    if (closeBtn) closeBtn.addEventListener('click', closeFilters);
+    if (backdrop) backdrop.addEventListener('click', closeFilters);
+
     function onBreakpointChange() {
       var newPer = DESKTOP_MQ.matches ? perDesktop : perMobile;
+      if (DESKTOP_MQ.matches) closeFilters();
       if (newPer === perPage) return;
-      // Keep the user roughly where they were when columns change
       var firstVisible = (current - 1) * perPage;
       perPage = newPer;
       showPage(Math.floor(firstVisible / perPage) + 1);
     }
-
     if (DESKTOP_MQ.addEventListener) DESKTOP_MQ.addEventListener('change', onBreakpointChange);
     else if (DESKTOP_MQ.addListener) DESKTOP_MQ.addListener(onBreakpointChange);
 
-    showPage(1);
+    clampRange();
+    refresh();
   })();
 })();

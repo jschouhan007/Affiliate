@@ -294,13 +294,21 @@ function CatalogueCard(deal: Deal, sourcePath: string): string {
   const priceKey = cheapest?.price ?? ''
   const dateKey = deal.created_at ? Date.parse(deal.created_at) || 0 : 0
   const popKey = (deal.rating_count ?? 0)
+  const inStock = (deal.offers || []).some((o) => o.in_stock !== 0) ? 1 : 0
 
   return `<article class="cat-card"
       data-price="${priceKey}"
       data-date="${dateKey}"
       data-pop="${popKey}"
       data-rating="${deal.rating ?? 0}"
-      data-disc="${disc ?? 0}">
+      data-disc="${disc ?? 0}"
+      data-brand="${escapeAttr(deal.brand || '')}"
+      data-category="${escapeAttr(deal.category_slug || '')}"
+      data-category-name="${escapeAttr(deal.category_name || '')}"
+      data-features="${escapeAttr(deal.features || '')}"
+      data-title="${escapeAttr(deal.title)}"
+      data-stock="${inStock}"
+      data-buyable="${buyable ? 1 : 0}">
     <a href="/reviews/${deal.slug}" class="cat-card__media" aria-label="${escapeAttr(deal.title)}">
       ${img}
       <div class="cat-card__noimg" ${deal.image_url ? 'style="display:none"' : ''}><i class="fas fa-box-open"></i></div>
@@ -332,9 +340,13 @@ function SortBar(total: number): string {
     ['oldest', 'Oldest First'],
     ['popularity', 'Popularity'],
     ['discount', 'Discount'],
+    ['rating', 'Customer Rating'],
   ]
   return `<div class="cat-sort" data-count="${total}">
-    <p class="cat-sort__count"><span class="cat-sort__num">${total}</span> product${total === 1 ? '' : 's'}</p>
+    <button type="button" id="cat-filter-open" class="cat-sort__filterbtn lg:hidden" aria-label="Open filters">
+      <i class="fas fa-sliders"></i> Filters <span class="cat-sort__activecount" id="cat-active-count" hidden>0</span>
+    </button>
+    <p class="cat-sort__count"><span class="cat-sort__num" id="catalogue-count">${total}</span> <span id="catalogue-count-word">product${total === 1 ? '' : 's'}</span></p>
     <div class="cat-sort__right">
       <label class="cat-sort__label" for="catalogue-sort">Sort by</label>
       <div class="cat-sort__select">
@@ -347,10 +359,112 @@ function SortBar(total: number): string {
   </div>`
 }
 
+// ---- Catalogue filter rail (left side). Derives facets from the deals shown. ----
+function CatalogueFilters(deals: Deal[]): string {
+  const prices = deals
+    .flatMap((d) => (d.offers || []).filter((o) => o.price != null).map((o) => o.price as number))
+  const maxPrice = prices.length ? Math.ceil(Math.max(...prices) / 500) * 500 : 100000
+  const minPrice = 0
+
+  const brands = (Array.from(new Set(deals.map((d) => d.brand).filter(Boolean))) as string[]).sort()
+
+  // Categories present (useful on homepage / search where products span categories)
+  const catMap = new Map<string, string>()
+  deals.forEach((d) => { if (d.category_slug && d.category_name) catMap.set(d.category_slug, d.category_name) })
+  const cats = Array.from(catMap.entries()).sort((a, b) => a[1].localeCompare(b[1]))
+
+  const featureSet = new Set<string>()
+  deals.forEach((d) =>
+    (d.features || '').split(',').map((f) => f.trim()).filter(Boolean).forEach((f) => featureSet.add(f))
+  )
+  const features = Array.from(featureSet).sort()
+
+  const ratingRows = [4, 3, 2]
+    .map(
+      (r) => `<label class="cat-filter__opt">
+        <input type="radio" name="cat-rating" value="${r}" />
+        <span class="cat-filter__stars">${'<i class="fas fa-star"></i>'.repeat(r)}${'<i class="far fa-star"></i>'.repeat(5 - r)}</span>
+        <span class="cat-filter__optlabel">${r}.0 &amp; up</span>
+      </label>`
+    )
+    .join('')
+
+  const catRows = cats
+    .map(
+      ([slug, name]) => `<label class="cat-filter__opt">
+        <input type="checkbox" class="cat-cat" value="${escapeAttr(slug)}" /> <span class="cat-filter__optlabel">${name}</span>
+      </label>`
+    )
+    .join('')
+
+  const brandRows = brands
+    .map(
+      (b) => `<label class="cat-filter__opt">
+        <input type="checkbox" class="cat-brand" value="${escapeAttr(b)}" /> <span class="cat-filter__optlabel">${b}</span>
+      </label>`
+    )
+    .join('')
+
+  const featureRows = features
+    .map((f) => `<button type="button" class="cat-chip cat-feature" data-feature="${escapeAttr(f)}">${f}</button>`)
+    .join('')
+
+  return `<aside id="catalogue-filters" class="cat-filters" data-min="${minPrice}" data-max="${maxPrice}" aria-label="Filters">
+    <div class="cat-filters__head">
+      <h2 class="cat-filters__title"><i class="fas fa-sliders"></i> Filters</h2>
+      <button type="button" id="cat-filter-close" class="cat-filters__close lg:hidden" aria-label="Close filters"><i class="fas fa-xmark"></i></button>
+      <button type="button" id="cat-reset" class="cat-filters__reset">Clear all</button>
+    </div>
+
+    <div class="cat-filters__active" id="cat-active-chips" hidden></div>
+
+    <div class="cat-filters__group">
+      <div class="cat-filters__legend">Price range</div>
+      <div class="cat-range" id="cat-range">
+        <div class="cat-range__track"><div class="cat-range__fill" id="cat-range-fill"></div></div>
+        <input type="range" id="cat-price-min" min="${minPrice}" max="${maxPrice}" value="${minPrice}" step="100" aria-label="Minimum price" />
+        <input type="range" id="cat-price-max" min="${minPrice}" max="${maxPrice}" value="${maxPrice}" step="100" aria-label="Maximum price" />
+      </div>
+      <div class="cat-range__vals">
+        <span id="cat-price-min-val">₹0</span>
+        <span id="cat-price-max-val">₹${maxPrice.toLocaleString('en-IN')}</span>
+      </div>
+    </div>
+
+    <div class="cat-filters__group">
+      <div class="cat-filters__legend">Customer rating</div>
+      ${ratingRows}
+    </div>
+
+    <div class="cat-filters__group">
+      <div class="cat-filters__legend">Availability</div>
+      <label class="cat-filter__opt"><input type="checkbox" id="cat-instock" /> <span class="cat-filter__optlabel">In stock only</span></label>
+      <label class="cat-filter__opt"><input type="checkbox" id="cat-buyable" /> <span class="cat-filter__optlabel">Buy-now available</span></label>
+      <label class="cat-filter__opt"><input type="checkbox" id="cat-deal" /> <span class="cat-filter__optlabel">On offer (discounted)</span></label>
+    </div>
+
+    ${cats.length > 1 ? `<div class="cat-filters__group">
+      <div class="cat-filters__legend">Category</div>
+      <div class="cat-filters__scroll">${catRows}</div>
+    </div>` : ''}
+
+    ${brands.length ? `<div class="cat-filters__group">
+      <div class="cat-filters__legend">Brand</div>
+      <input type="text" id="cat-brand-search" class="cat-filters__search" placeholder="Search brands…" aria-label="Search brands" />
+      <div class="cat-filters__scroll" id="cat-brand-list">${brandRows}</div>
+    </div>` : ''}
+
+    ${features.length ? `<div class="cat-filters__group cat-filters__group--last">
+      <div class="cat-filters__legend">Features</div>
+      <div class="cat-chips">${featureRows}</div>
+    </div>` : ''}
+  </aside>`
+}
+
 /**
- * CatalogueGrid — reusable paginated + sortable product grid.
- * opts.heading   → optional centred heading block (homepage uses it)
- * opts.eyebrow / opts.title / opts.subtitle → heading content
+ * CatalogueGrid — reusable filterable + sortable + paginated product grid.
+ * Filters live on the LEFT; sort bar + grid + pager on the RIGHT.
+ * opts.heading → optional centred heading block (homepage uses it)
  */
 export function CatalogueGrid(
   deals: Deal[],
@@ -372,10 +486,21 @@ export function CatalogueGrid(
            data-per-desktop="20" data-per-mobile="16" data-total="${deals.length}">
     <div class="max-w-editorial mx-auto px-5 py-12 md:py-16">
       ${head}
-      ${SortBar(deals.length)}
-      <div class="catalogue__grid" id="catalogue-grid">${cards}</div>
-      <nav class="catalogue__pager" id="catalogue-pager" aria-label="Catalogue pages"></nav>
+      <div class="catalogue__layout">
+        ${CatalogueFilters(deals)}
+        <div class="catalogue__main">
+          ${SortBar(deals.length)}
+          <div class="catalogue__grid" id="catalogue-grid">${cards}</div>
+          <div class="catalogue__empty is-hidden" id="catalogue-empty">
+            <i class="fas fa-filter-circle-xmark text-3xl mb-3"></i>
+            <p class="mb-4">No products match these filters.</p>
+            <button type="button" id="cat-reset-2" class="btn btn-line btn-sm">Clear filters</button>
+          </div>
+          <nav class="catalogue__pager" id="catalogue-pager" aria-label="Catalogue pages"></nav>
+        </div>
+      </div>
     </div>
+    <div class="cat-filters__backdrop" id="cat-filters-backdrop" hidden></div>
   </section>`
 }
 

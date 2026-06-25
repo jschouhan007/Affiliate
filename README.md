@@ -62,8 +62,15 @@ generic template.
   pull spoke reviews automatically by rule (`manual` curated picks, `category`, `feature`, or
   `price` ceiling). Auto internal-links to every spoke review + sticky contents nav, comparison
   matrix, and ItemList JSON-LD.
-- **Faceted Search & Filtering** (on `/deals` + `/category/:slug`) — sidebar filtering by
-  **price range, user rating, brand and features simultaneously**, instant client-side, no reload.
+- **Catalogue Filter rail** (LEFT side of **every** catalogue — homepage, `/deals`, every
+  `/category/:slug`, AND `/search` results) — instant, client-side, no reload. Filters:
+  **dual-thumb price-range slider**, **customer rating** (4/3/2 ★ & up), **availability**
+  (in stock / buy-now / on offer), **category**, **brand** (with a live brand search box), and
+  **feature** toggle chips — all ANDed together. **Removable active-filter chips** sit at the top
+  of the rail, a **Reset** clears everything, and a **live result count** updates as you filter.
+  On mobile the rail collapses into a slide-in **Filters drawer** (with backdrop) opened from the
+  sort bar, with a badge showing the number of active filters. Filtering runs *before* sorting and
+  pagination, so the three work together on the same card list.
 - **Interactive Comparison Matrix** — "Compare" toggle on every product card → sticky compare
   tray (max 4, `localStorage`) → `/compare?ids=` matrix comparing price, rating, brand, award,
   specs and features, with lowest-price & top-rated highlights.
@@ -85,10 +92,13 @@ generic template.
   grid that is **5 columns × 4 rows = 20 per page on desktop** and **2 columns × 8 rows = 16 per
   page on mobile**, with **numbered pagination** (windowed `1 … n` with prev/next) below. Every
   product photo sits in a fixed square box with `object-contain` for perfect, uniform fit.
-- **Flipkart-style "Sort By"** on every catalogue (homepage, deals, all categories):
-  Relevance, Price Low→High, Price High→Low, Newest, Oldest, Popularity, Discount. Sorting
-  reorders cards client-side and re-paginates from page 1; products without a price sink to the
-  bottom on price sorts.
+- **Flipkart-style "Sort By"** on every catalogue (homepage, deals, all categories, **and search
+  results**): Relevance, Price Low→High, Price High→Low, Newest, Oldest, Popularity, Discount,
+  **Customer Rating**. Sorting reorders the *filtered* cards client-side and re-paginates from
+  page 1; products without a price sink to the bottom on price sorts.
+- **Filter + Sort on search results** (`/search?q=`) — search now uses the same unified catalogue
+  grid, so matching products get the full left filter rail + Sort By + pagination, with blog post
+  matches listed below.
 - **Performance** — strict image `width`/`height` (zero CLS), lazy images, skeleton loaders, and
   heavy matrices lazy-revealed on scroll via `IntersectionObserver`. Respects `prefers-reduced-motion`.
 - **Rich product blog** — 10 in-depth posts (long-term reviews, head-to-heads, setup & buying
