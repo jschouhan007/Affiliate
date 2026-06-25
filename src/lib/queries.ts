@@ -168,26 +168,143 @@ export async function getFaqs(
   return results || []
 }
 
+// ---- Search helpers -------------------------------------------------------
+// Lightweight English stop-words + a small synonym/related-word map so that a
+// search for one word also surfaces obviously-related products (e.g. "phone"
+// also matches "smartphone"/"mobile"; "shoe" matches "sneaker"/"footwear").
+const SEARCH_STOP = new Set([
+  'the', 'a', 'an', 'and', 'or', 'of', 'for', 'with', 'to', 'in', 'on', 'at',
+  'best', 'top', 'cheap', 'buy', 'price', 'deal', 'deals', 'review', 'reviews',
+  'good', 'new', 'my', 'me', 'is', 'are', 'this', 'that',
+])
+
+const SEARCH_SYNONYMS: Record<string, string[]> = {
+  phone: ['smartphone', 'mobile', 'iphone', 'android', 'cellphone'],
+  smartphone: ['phone', 'mobile', 'iphone', 'android'],
+  mobile: ['phone', 'smartphone', 'cellphone'],
+  laptop: ['notebook', 'macbook', 'ultrabook', 'chromebook'],
+  notebook: ['laptop', 'ultrabook'],
+  tv: ['television', 'smarttv'],
+  television: ['tv'],
+  earphone: ['earphones', 'earbuds', 'headphone', 'headphones', 'tws', 'airpods'],
+  earbuds: ['earphones', 'headphones', 'tws', 'airpods', 'earphone'],
+  headphone: ['headphones', 'earphones', 'earbuds'],
+  shoe: ['shoes', 'sneaker', 'sneakers', 'footwear', 'trainers'],
+  shoes: ['shoe', 'sneaker', 'sneakers', 'footwear'],
+  sneaker: ['sneakers', 'shoe', 'shoes', 'footwear', 'trainers'],
+  watch: ['watches', 'smartwatch', 'wristwatch'],
+  smartwatch: ['watch', 'watches', 'wearable'],
+  tshirt: ['t-shirt', 'tee', 'shirt', 'top'],
+  shirt: ['shirts', 'tshirt', 't-shirt', 'tee', 'top'],
+  jeans: ['denim', 'pants', 'trousers'],
+  bag: ['bags', 'backpack', 'handbag', 'tote'],
+  backpack: ['bag', 'rucksack', 'bags'],
+  jacket: ['jackets', 'coat', 'outerwear'],
+  dress: ['dresses', 'gown', 'frock'],
+  camera: ['cameras', 'dslr', 'mirrorless'],
+  speaker: ['speakers', 'soundbar', 'bluetooth'],
+  perfume: ['fragrance', 'cologne', 'scent'],
+  fragrance: ['perfume', 'cologne', 'scent'],
+}
+
+// Split a query into useful lowercased tokens, expanding via the synonym map.
+// Returns { tokens, expanded } where expanded includes synonyms for OR matching.
+export function searchTokens(q: string): { tokens: string[]; expanded: string[] } {
+  const raw = (q || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+  const tokens = raw.filter((t) => t.length > 1 && !SEARCH_STOP.has(t))
+  const set = new Set<string>(tokens.length ? tokens : raw)
+  for (const t of [...set]) {
+    const syns = SEARCH_SYNONYMS[t]
+    if (syns) for (const s of syns) set.add(s)
+    // singular/plural fold
+    if (t.endsWith('s') && t.length > 3) set.add(t.slice(0, -1))
+    else set.add(t + 's')
+  }
+  return { tokens: tokens.length ? tokens : raw, expanded: [...set] }
+}
+
+// Score a deal against the search tokens. Higher = more relevant. Weighted so
+// title/brand/category matches rank above description/feature matches, and
+// exact-phrase / starts-with get a bonus.
+function scoreDeal(d: Deal, tokens: string[], expanded: string[], phrase: string): number {
+  const title = (d.title || '').toLowerCase()
+  const brand = (d.brand || '').toLowerCase()
+  const cat = `${d.category_name || ''} ${d.category_slug || ''}`.toLowerCase()
+  const feat = (d.features || '').toLowerCase()
+  const desc = `${d.short_desc || ''} ${d.description || ''}`.toLowerCase()
+  let score = 0
+  if (phrase && title.includes(phrase)) score += 60
+  if (phrase && title.startsWith(phrase)) score += 40
+  for (const t of expanded) {
+    if (!t) continue
+    const exact = tokens.includes(t)
+    const w = exact ? 1 : 0.5 // synonym/fold matches weigh less
+    if (title.includes(t)) score += 30 * w
+    if (brand.includes(t)) score += 22 * w
+    if (cat.includes(t)) score += 18 * w
+    if (feat.includes(t)) score += 10 * w
+    if (desc.includes(t)) score += 6 * w
+  }
+  // tie-breakers: featured + rating + popularity
+  if (d.featured) score += 4
+  score += (d.rating || 0) * 1.5
+  score += Math.min((d.rating_count || 0) / 50, 5)
+  return score
+}
+
 export async function searchAll(
   db: D1Database,
   q: string
 ): Promise<{ deals: Deal[]; posts: Post[] }> {
-  const like = `%${q}%`
-  const { results: deals } = await db
-    .prepare(
-      DEAL_SELECT +
-        ' WHERE d.published = 1 AND (d.title LIKE ? OR d.brand LIKE ? OR d.short_desc LIKE ?) LIMIT 20'
-    )
-    .bind(like, like, like)
-    .all<Deal>()
+  const phrase = (q || '').trim().toLowerCase()
+  const { tokens, expanded } = searchTokens(q)
+  if (!expanded.length) return { deals: [], posts: [] }
+
+  // Build a broad SQL OR across title/brand/category/features/short_desc/description
+  // for every expanded token, then score + rank in JS for relevance.
+  const fields = [
+    'd.title', 'd.brand', 'd.short_desc', 'd.description', 'd.features',
+    'c.name', 'c.slug',
+  ]
+  const ors: string[] = []
+  const binds: unknown[] = []
+  for (const t of expanded) {
+    const like = `%${t}%`
+    for (const f of fields) {
+      ors.push(`${f} LIKE ?`)
+      binds.push(like)
+    }
+  }
+  const sql =
+    DEAL_SELECT +
+    ` WHERE d.published = 1 AND (${ors.join(' OR ')}) LIMIT 200`
+  const { results: rawDeals } = await db.prepare(sql).bind(...binds).all<Deal>()
+  let deals = (rawDeals || [])
+    .map((d) => ({ d, s: scoreDeal(d, tokens, expanded, phrase) }))
+    .filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, 60)
+    .map((x) => x.d)
+  for (const d of deals) d.offers = await getOffersForDeal(db, d.id)
+
+  // Posts: token OR across title/excerpt/body
+  const pOrs: string[] = []
+  const pBinds: unknown[] = []
+  for (const t of expanded) {
+    const like = `%${t}%`
+    pOrs.push('p.title LIKE ?', 'p.excerpt LIKE ?', 'p.body LIKE ?')
+    pBinds.push(like, like, like)
+  }
   const { results: posts } = await db
-    .prepare(
-      POST_SELECT +
-        ' WHERE p.published = 1 AND (p.title LIKE ? OR p.excerpt LIKE ?) LIMIT 20'
-    )
-    .bind(like, like)
+    .prepare(POST_SELECT + ` WHERE p.published = 1 AND (${pOrs.join(' OR ')}) LIMIT 20`)
+    .bind(...pBinds)
     .all<Post>()
-  return { deals: deals || [], posts: posts || [] }
+  return { deals, posts: posts || [] }
 }
 
 // ---- Hubs (hub-and-spoke) ----
@@ -645,21 +762,118 @@ export async function duplicatePost(db: D1Database, id: number): Promise<number 
   })
 }
 
+// Cheapest in-stock (or any) price for a deal, used for price-proximity scoring.
+function dealPrice(d: Deal): number | null {
+  const priced = (d.offers || []).filter((o) => o.price != null)
+  if (!priced.length) return null
+  return Math.min(...priced.map((o) => o.price as number))
+}
+
+function tokenizeFeatures(s?: string): Set<string> {
+  return new Set(
+    (s || '')
+      .toLowerCase()
+      .split(/[,;|]/)
+      .map((x) => x.trim())
+      .filter(Boolean)
+  )
+}
+
+// Smart content-based recommendation. Scores every candidate against the seed
+// deal(s): same category (strong), same brand, shared features, price
+// proximity, plus a quality boost (rating/featured). Returns the top `limit`.
 export async function getRelatedDeals(
   db: D1Database,
   categoryId: number | undefined,
   excludeId: number,
-  limit = 4
+  limit = 8
 ): Promise<Deal[]> {
-  if (!categoryId) return []
+  // Seed deal (so we can score by brand/features/price, not just category).
+  const seed = await db
+    .prepare(DEAL_SELECT + ' WHERE d.id = ?')
+    .bind(excludeId)
+    .first<Deal>()
+  if (seed) seed.offers = await getOffersForDeal(db, seed.id)
+
+  // Pull a generous candidate pool (same category first, then everything).
   const { results } = await db
     .prepare(
       DEAL_SELECT +
-        ' WHERE d.published = 1 AND d.category_id = ? AND d.id != ? ORDER BY d.updated_at DESC LIMIT ?'
+        ' WHERE d.published = 1 AND d.id != ? ORDER BY (CASE WHEN d.category_id = ? THEN 0 ELSE 1 END), d.featured DESC, d.rating DESC LIMIT 120'
     )
-    .bind(categoryId, excludeId, limit)
+    .bind(excludeId, categoryId ?? -1)
     .all<Deal>()
-  const deals = results || []
-  for (const d of deals) d.offers = await getOffersForDeal(db, d.id)
-  return deals
+  let pool = results || []
+  for (const d of pool) d.offers = await getOffersForDeal(db, d.id)
+
+  const seedFeatures = tokenizeFeatures(seed?.features)
+  const seedPrice = seed ? dealPrice(seed) : null
+  const seedBrand = (seed?.brand || '').toLowerCase()
+
+  const scored = pool.map((d) => {
+    let score = 0
+    if (categoryId && d.category_id === categoryId) score += 50
+    if (seedBrand && (d.brand || '').toLowerCase() === seedBrand) score += 25
+    // shared features
+    if (seedFeatures.size) {
+      const f = tokenizeFeatures(d.features)
+      let shared = 0
+      for (const x of f) if (seedFeatures.has(x)) shared++
+      score += shared * 8
+    }
+    // price proximity (closer = better, within ~40% band)
+    const p = dealPrice(d)
+    if (seedPrice != null && p != null && seedPrice > 0) {
+      const ratio = Math.abs(p - seedPrice) / seedPrice
+      if (ratio <= 0.4) score += (0.4 - ratio) / 0.4 * 20
+    }
+    // quality signal
+    score += (d.rating || 0) * 2
+    score += Math.min((d.rating_count || 0) / 50, 4)
+    if (d.featured) score += 5
+    return { d, score }
+  })
+
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((x) => x.d)
+}
+
+// Recommendations for a SET of seed deals (used on search results): aggregate
+// the categories/brands of the matches and recommend popular items in those
+// spaces that are NOT already in the result set.
+export async function getRecommendationsForDeals(
+  db: D1Database,
+  seeds: Deal[],
+  limit = 8
+): Promise<Deal[]> {
+  if (!seeds.length) return []
+  const seedIds = new Set(seeds.map((s) => s.id))
+  const catIds = new Set(seeds.map((s) => s.category_id).filter((x): x is number => x != null))
+  const brands = new Set(seeds.map((s) => (s.brand || '').toLowerCase()).filter(Boolean))
+
+  const { results } = await db
+    .prepare(
+      DEAL_SELECT +
+        ' WHERE d.published = 1 ORDER BY d.featured DESC, d.rating DESC, d.rating_count DESC LIMIT 150'
+    )
+    .all<Deal>()
+  let pool = (results || []).filter((d) => !seedIds.has(d.id))
+  for (const d of pool) d.offers = await getOffersForDeal(db, d.id)
+
+  const scored = pool.map((d) => {
+    let score = 0
+    if (d.category_id && catIds.has(d.category_id)) score += 40
+    if (d.brand && brands.has(d.brand.toLowerCase())) score += 20
+    score += (d.rating || 0) * 2
+    score += Math.min((d.rating_count || 0) / 50, 4)
+    if (d.featured) score += 5
+    return { d, score }
+  })
+  return scored
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((x) => x.d)
 }

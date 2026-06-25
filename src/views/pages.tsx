@@ -20,6 +20,7 @@ import {
   stars,
   HeroCarousel,
   CatalogueGrid,
+  RecommendationStrip,
 } from './components'
 
 // ============================================================
@@ -366,10 +367,9 @@ export function ReviewPage(data: {
 
     ${FaqSection(faqs)}
 
-    ${related.length ? `<section class="mt-20 pt-16 border-t border-line">
-      ${SectionHeader('Considered alongside', 'Alternatives')}
-      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">${related.map((d) => DealCard(d)).join('')}</div>
-    </section>` : ''}
+    ${related.length ? `<div class="mt-20 pt-12 border-t border-line">
+      ${RecommendationStrip(related, { title: 'You may also like', eyebrow: 'Recommended', id: 'review-reco' })}
+    </div>` : ''}
   </div>
   ${NewsletterBox()}`
 }
@@ -464,8 +464,8 @@ export function PostPage(data: {
 // ============================================================
 // SEARCH
 // ============================================================
-export function SearchPage(data: { q: string; deals: Deal[]; posts: Post[] }): string {
-  const { q, deals, posts } = data
+export function SearchPage(data: { q: string; deals: Deal[]; posts: Post[]; recommended?: Deal[] }): string {
+  const { q, deals, posts, recommended = [] } = data
   const total = deals.length + posts.length
   // escape user-supplied query before reflecting it into HTML (prevents XSS)
   const safeQ = String(q).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string))
@@ -474,12 +474,13 @@ export function SearchPage(data: { q: string; deals: Deal[]; posts: Post[] }): s
     <header class="text-center mb-2">
       <div class="eyebrow eyebrow-mute mb-2">Search</div>
       <h1 class="font-serif text-4xl text-ink break-words">Results for "${safeQ}"</h1>
-      <p class="mt-2 text-ink-mute">${total} result${total === 1 ? '' : 's'} found.</p>
+      <p class="mt-2 text-ink-mute">${deals.length} product${deals.length === 1 ? '' : 's'}${posts.length ? ` · ${posts.length} article${posts.length === 1 ? '' : 's'}` : ''} found.</p>
     </header>
   </div>
   ${deals.length ? CatalogueGrid(deals, `/search?q=${encodeURIComponent(q)}`) : ''}
-  ${posts.length ? `<div class="max-w-editorial mx-auto px-5 py-12"><section>${SectionHeader('Articles', 'Reading')}<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">${posts.map(PostCard).join('')}</div></section></div>` : ''}
-  ${!total ? `<div class="max-w-editorial mx-auto px-5 text-center py-24 text-ink-faint"><i class="fas fa-magnifying-glass text-3xl mb-4"></i><p>Nothing matched. Try another term.</p></div>` : ''}`
+  ${!total ? `<div class="max-w-editorial mx-auto px-5 text-center py-20 text-ink-faint"><i class="fas fa-magnifying-glass text-3xl mb-4"></i><p>No exact matches for "${safeQ}". Here are some popular picks you might like.</p></div>` : ''}
+  ${recommended.length ? `<div class="max-w-editorial mx-auto px-5 ${total ? 'pt-4' : ''} pb-4">${RecommendationStrip(recommended, { title: total ? 'Similar products you may like' : 'Popular right now', eyebrow: 'Recommended for you', id: 'search-reco' })}</div>` : ''}
+  ${posts.length ? `<div class="max-w-editorial mx-auto px-5 py-12"><section>${SectionHeader('Articles', 'Reading')}<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">${posts.map(PostCard).join('')}</div></section></div>` : ''}`
 }
 
 // ============================================================

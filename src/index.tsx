@@ -207,7 +207,7 @@ app.get('/reviews/:slug', async (c) => {
   if (!deal) return notFound(c, categories)
   const [faqs, related] = await Promise.all([
     Q.getFaqs(db, 'deal', deal.id),
-    Q.getRelatedDeals(db, deal.category_id, deal.id, 4),
+    Q.getRelatedDeals(db, deal.category_id, deal.id, 10),
   ])
   const sourcePath = `/reviews/${slug}`
   const body = Pages.ReviewPage({ deal, faqs, related, sourcePath })
@@ -313,12 +313,20 @@ app.get('/search', async (c) => {
   const categories = await Q.getCategories(db)
   let deals: any[] = []
   let posts: any[] = []
+  let recommended: any[] = []
   if (q) {
     const res = await Q.searchAll(db, q)
     deals = res.deals
     posts = res.posts
+    // Similar-product recommendations based on the matched results (or, when
+    // nothing matched, a popular fallback so the page is never a dead end).
+    if (deals.length) {
+      recommended = await Q.getRecommendationsForDeals(db, deals, 8)
+    } else {
+      recommended = await Q.getDeals(db, { featured: true, limit: 8 })
+    }
   }
-  const body = Pages.SearchPage({ q, deals, posts })
+  const body = Pages.SearchPage({ q, deals, posts, recommended })
   return page(c, {
     title: q ? `Search: ${q}` : 'Search',
     description: `Search results for ${q}`,

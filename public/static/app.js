@@ -694,3 +694,56 @@
     refresh();
   })();
 })();
+
+/* ── Recommendation strip: swipable / drag-scroll + arrow controls ─────────── */
+(function () {
+  function initStrip(strip) {
+    var track = strip.querySelector('[data-reco-track]');
+    if (!track) return;
+    var prev = strip.querySelector('[data-reco-prev]');
+    var next = strip.querySelector('[data-reco-next]');
+
+    function step() {
+      var card = track.querySelector('.reco-card');
+      var w = card ? card.getBoundingClientRect().width + 16 : 240;
+      return Math.max(w, Math.round(track.clientWidth * 0.8));
+    }
+    function updateArrows() {
+      var max = track.scrollWidth - track.clientWidth - 2;
+      if (prev) prev.disabled = track.scrollLeft <= 2;
+      if (next) next.disabled = track.scrollLeft >= max;
+      var overflow = track.scrollWidth > track.clientWidth + 4;
+      strip.classList.toggle('reco--has-overflow', overflow);
+    }
+    if (prev) prev.addEventListener('click', function () { track.scrollBy({ left: -step(), behavior: 'smooth' }); });
+    if (next) next.addEventListener('click', function () { track.scrollBy({ left: step(), behavior: 'smooth' }); });
+    track.addEventListener('scroll', function () { window.requestAnimationFrame(updateArrows); }, { passive: true });
+    window.addEventListener('resize', updateArrows);
+
+    /* Drag-to-scroll (desktop pointer). Native touch handles mobile swipe. */
+    var down = false, startX = 0, startScroll = 0, moved = false;
+    track.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'touch') return; /* let native touch scroll */
+      down = true; moved = false; startX = e.clientX; startScroll = track.scrollLeft;
+      track.classList.add('is-dragging');
+    });
+    window.addEventListener('pointermove', function (e) {
+      if (!down) return;
+      var dx = e.clientX - startX;
+      if (Math.abs(dx) > 4) moved = true;
+      track.scrollLeft = startScroll - dx;
+    });
+    window.addEventListener('pointerup', function () {
+      if (!down) return;
+      down = false;
+      track.classList.remove('is-dragging');
+    });
+    /* Prevent click navigation after a drag */
+    track.addEventListener('click', function (e) {
+      if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; }
+    }, true);
+
+    updateArrows();
+  }
+  document.querySelectorAll('[data-reco]').forEach(initStrip);
+})();

@@ -99,6 +99,24 @@ generic template.
 - **Filter + Sort on search results** (`/search?q=`) — search now uses the same unified catalogue
   grid, so matching products get the full left filter rail + Sort By + pagination, with blog post
   matches listed below.
+- **Smart relevance search** (`/search?q=`) — the query is tokenised (stop-words stripped),
+  expanded with a **synonym / related-word map** (e.g. *phone* → smartphone/mobile/iphone,
+  *shoes* → sneaker/footwear, *earbuds* → tws/headphones) and singular/plural folds, then matched
+  across **title, brand, category, features, short description and full description**. Results are
+  **scored & ranked by relevance** (title > brand > category > features > description, with
+  exact-phrase and quality boosts) so searching a category, feature or related word surfaces *all*
+  relevant products — not just literal title matches.
+- **Content-based recommendation engine** — `getRelatedDeals` scores every candidate against the
+  seed product by **same category (strong), same brand, shared features, price proximity, and a
+  rating/featured quality boost**, returning the most genuinely similar items. `getRecommendationsForDeals`
+  aggregates the categories/brands of a whole result set to recommend popular adjacent products.
+- **Similar-product recommendations on search** — every search shows a *"Similar products you may
+  like"* strip below the results; when nothing matches it gracefully falls back to a *"Popular right
+  now"* strip so the page is never a dead end.
+- **Horizontal swipable recommendation strip** — on every product page (`/reviews/:slug`) a
+  *"You may also like"* strip of up to 10 content-matched products sits below the review:
+  scroll-snapping, native touch-swipe on mobile, **drag-to-scroll + prev/next arrow controls** on
+  desktop (arrows auto-disable at the ends), with compact hover-zoom cards.
 - **Performance** — strict image `width`/`height` (zero CLS), lazy images, skeleton loaders, and
   heavy matrices lazy-revealed on scroll via `IntersectionObserver`. Respects `prefers-reduced-motion`.
 - **Rich product blog** — 10 in-depth posts (long-term reviews, head-to-heads, setup & buying
@@ -267,6 +285,9 @@ npm run db:reset
 - Cloudflare Pages + Workers runtime · Cloudflare D1 (SQLite)
 - Tailwind CSS (CDN) · Font Awesome (CDN)
 
-**Last Updated**: 2026-06-24 (catalogue grid 5×4/2×8 + Flipkart-style Sort By everywhere +
-clean category pages + animated Home nav icon + multi-message marquee + hero consistent
-height/cover-fit/zoom + 3s autoplay + smaller dots)
+**Last Updated**: 2026-06-25 (restored + improved left filter rail on all catalogues & search +
+Sort/Filter on search results + smart relevance search with synonym/related-word matching across
+title/brand/category/features/description + content-based recommendation engine + similar-product
+recommendations on search + horizontal swipable "You may also like" strip on product pages ·
+previously: catalogue grid 5×4/2×8 + Flipkart-style Sort By everywhere + clean category pages +
+animated Home nav icon + multi-message marquee + hero cover-fit/zoom + 3s autoplay + smaller dots)

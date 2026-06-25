@@ -262,6 +262,61 @@ export function DealGrid(deals: Deal[], ranked = false, sourcePath?: string, com
     .join('')}</div>`
 }
 
+// Compact card used inside the horizontal swipable recommendation strip.
+function RecoCard(deal: Deal): string {
+  const cheapest = (deal.offers || [])
+    .filter((o) => o.price != null)
+    .sort((a, b) => (a.price as number) - (b.price as number))[0]
+  const disc = cheapest ? discountPct(cheapest.price, cheapest.original_price) : null
+  const img = deal.image_url
+    ? `<img src="${deal.image_url}" alt="${escapeAttr(deal.title)}" loading="lazy" decoding="async" class="reco-card__img" />`
+    : `<div class="reco-card__img reco-card__img--empty"><i class="fas fa-box-open"></i></div>`
+  return `<a href="/reviews/${deal.slug}" class="reco-card" data-id="${deal.id}">
+    <div class="reco-card__media">
+      ${img}
+      ${disc ? `<span class="reco-card__disc">−${disc}%</span>` : ''}
+    </div>
+    <div class="reco-card__body">
+      ${deal.category_name ? `<span class="reco-card__eyebrow">${escapeAttr(deal.category_name)}</span>` : ''}
+      <h3 class="reco-card__title">${deal.title}</h3>
+      ${deal.rating ? `<div class="reco-card__rating">${stars(deal.rating, 'text-[0.62rem]')}<span>${deal.rating.toFixed(1)}</span></div>` : ''}
+      <div class="reco-card__price">
+        ${cheapest
+          ? `<span class="reco-card__from">From</span><span class="reco-card__amt">${formatPrice(cheapest.price, cheapest.currency)}</span>`
+          : `<span class="reco-card__amt-mute">View price</span>`}
+      </div>
+    </div>
+  </a>`
+}
+
+// Horizontal swipable recommendation strip ("You may also like" / similar items).
+// Scroll-snaps, drag-to-scroll on desktop, native touch swipe on mobile, with
+// prev/next arrow controls that the JS wires up.
+export function RecommendationStrip(
+  deals: Deal[],
+  opts: { title?: string; eyebrow?: string; id?: string } = {}
+): string {
+  if (!deals || deals.length === 0) return ''
+  const title = opts.title || 'You may also like'
+  const eyebrow = opts.eyebrow || 'Recommended'
+  const id = opts.id || 'reco'
+  return `<section class="reco" data-reco aria-label="${escapeAttr(title)}">
+    <div class="reco__head">
+      <div>
+        <div class="eyebrow eyebrow-mute mb-1">${eyebrow}</div>
+        <h2 class="reco__title">${title}</h2>
+      </div>
+      <div class="reco__nav">
+        <button type="button" class="reco__arrow" data-reco-prev aria-label="Scroll left"><i class="fas fa-chevron-left"></i></button>
+        <button type="button" class="reco__arrow" data-reco-next aria-label="Scroll right"><i class="fas fa-chevron-right"></i></button>
+      </div>
+    </div>
+    <div class="reco__track" data-reco-track id="${id}-track">
+      ${deals.map(RecoCard).join('')}
+    </div>
+  </section>`
+}
+
 // ============================================================
 // CATALOGUE — dense responsive product grid with Flipkart-style "Sort By",
 // numbered pagination, and uniform image fit.
