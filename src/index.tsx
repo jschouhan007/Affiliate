@@ -110,11 +110,15 @@ app.get('/category/:slug', async (c) => {
   const categories = await Q.getCategories(db)
   const category = await Q.getCategoryBySlug(db, slug)
   if (!category) return notFound(c, categories)
-  const [deals, pillars] = await Promise.all([
-    Q.getDeals(db, { categoryId: category.id, limit: 200 }),
+  // Include products from every descendant subcategory (e.g. Fashion shows
+  // Men/Women and all their sub-subcategories), plus the children for sub-nav.
+  const catIds = await Q.getDescendantCategoryIds(db, category.id)
+  const [deals, pillars, children] = await Promise.all([
+    Q.getDeals(db, { categoryIds: catIds, limit: 200 }),
     Q.getPosts(db, { categoryId: category.id, pillar: true, limit: 3 }),
+    Q.getChildCategories(db, category.id),
   ])
-  const body = Pages.CategoryPage({ category, deals, pillars })
+  const body = Pages.CategoryPage({ category, deals, pillars, children })
   return page(c, {
     title: `${category.name} Deals`,
     description: category.description || `Best ${category.name} deals from Amazon, Flipkart & more.`,
@@ -762,6 +766,107 @@ app.post('/admin/carousel', async (c) => {
     .filter((n) => Number.isInteger(n))
   await Q.setCarouselIds(c.env.DB, ids)
   return c.redirect('/admin/carousel?flash=' + encodeURIComponent(`Carousel saved — ${Math.min(ids.length, 8)} product(s).`), 302)
+})
+
+// ============================================================
+// ADMIN — categories management
+// ============================================================
+async function buildCategoryRows(db: D1Database): Promise<Admin.AdminCategoryRow[]> {
+  const all = await Q.getAllCategories(db)
+  // Build ordered (root → sub → leaf) list with depth, then attach usage counts.
+  const byParent = new Map<number | null, typeof all>()
+  for (const c of all) {
+    const key = (c.parent_id ?? null) as number | null
+    if (!byParent.has(key)) byParent.set(key, [])
+    byParent.get(key)!.push(c)
+  }
+  const ordered: { c: (typeof all)[number]; depth: number }[] = []
+  const walk = (parent: number | null, depth: number) => {
+    for (const c of byParent.get(parent) || []) {
+      ordered.push({ c, depth })
+      walk(c.id, depth + 1)
+    }
+  }
+  walk(null, 0)
+  if (!ordered.length) for (const c of all) ordered.push({ c, depth: 0 })
+  const rows: Admin.AdminCategoryRow[] = []
+  for (const { c, depth } of ordered) {
+    const usage = await Q.getCategoryUsage(db, c.id)
+    rows.push({
+      id: c.id,
+      slug: c.slug,
+      name: c.name,
+      icon: c.icon,
+      parent_id: c.parent_id ?? null,
+      sort_order: (c as any).sort_order ?? 0,
+      deals: usage.deals,
+      posts: usage.posts,
+      depth,
+    })
+  }
+  return rows
+}
+
+function slugifyCat(s: string): string {
+  return String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+app.get('/admin/categories', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const rows = await buildCategoryRows(c.env.DB)
+  const flash = c.req.query('flash') || undefined
+  const error = c.req.query('error') || undefined
+  const editId = c.req.query('edit') ? parseInt(c.req.query('edit')!, 10) : undefined
+  return c.html(Admin.AdminCategories({ rows, flash, error, editId }) as any)
+})
+
+app.post('/admin/categories/new', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const b = await c.req.parseBody()
+  const name = String(b.name || '').trim()
+  const slug = slugifyCat(String(b.slug || name))
+  if (!name || !slug) return c.redirect('/admin/categories?error=' + encodeURIComponent('Name and slug are required.'), 302)
+  if (await Q.categorySlugExists(c.env.DB, slug)) return c.redirect('/admin/categories?error=' + encodeURIComponent(`Slug "${slug}" already exists.`), 302)
+  const parent_id = b.parent_id ? parseInt(String(b.parent_id), 10) : null
+  await Q.createCategory(c.env.DB, {
+    name,
+    slug,
+    icon: String(b.icon || '').trim() || null,
+    parent_id: Number.isInteger(parent_id) ? parent_id : null,
+    sort_order: parseInt(String(b.sort_order || '0'), 10) || 0,
+  })
+  return c.redirect('/admin/categories?flash=' + encodeURIComponent(`Category "${name}" added.`), 302)
+})
+
+app.post('/admin/categories/edit/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const id = parseInt(c.req.param('id'), 10)
+  const cat = await Q.getCategoryById(c.env.DB, id)
+  if (!cat) return c.redirect('/admin/categories?error=' + encodeURIComponent('Category not found.'), 302)
+  const b = await c.req.parseBody()
+  const name = String(b.name || '').trim()
+  const slug = slugifyCat(String(b.slug || name))
+  if (!name || !slug) return c.redirect('/admin/categories?error=' + encodeURIComponent('Name and slug are required.'), 302)
+  if (await Q.categorySlugExists(c.env.DB, slug, id)) return c.redirect('/admin/categories?error=' + encodeURIComponent(`Slug "${slug}" is used by another category.`), 302)
+  let parent_id = b.parent_id ? parseInt(String(b.parent_id), 10) : null
+  if (parent_id === id) parent_id = null // can't be its own parent
+  await Q.updateCategory(c.env.DB, id, {
+    name,
+    slug,
+    icon: String(b.icon || '').trim() || null,
+    parent_id: Number.isInteger(parent_id as number) ? parent_id : null,
+    sort_order: parseInt(String(b.sort_order || '0'), 10) || 0,
+  })
+  return c.redirect('/admin/categories?flash=' + encodeURIComponent(`Category "${name}" updated.`), 302)
+})
+
+app.post('/admin/categories/delete/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.redirect('/admin/login', 302)
+  const id = parseInt(c.req.param('id'), 10)
+  const cat = await Q.getCategoryById(c.env.DB, id)
+  if (!cat) return c.redirect('/admin/categories?error=' + encodeURIComponent('Category not found.'), 302)
+  await Q.deleteCategory(c.env.DB, id)
+  return c.redirect('/admin/categories?flash=' + encodeURIComponent(`Category "${cat.name}" deleted.`), 302)
 })
 
 // ============================================================

@@ -36,15 +36,15 @@ export function Layout(opts: LayoutOpts) {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script>
-    (function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+    (function(){try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark'){t='dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();
   </script>
   <title>${fullTitle}</title>
   <meta name="description" content="${description}" />
   ${keywords ? raw(`<meta name="keywords" content="${keywords.replace(/"/g, '&quot;')}" />`) : ''}
   <link rel="canonical" href="${canonUrl}" />
   ${noindex ? raw('<meta name="robots" content="noindex,follow" />') : raw('<meta name="robots" content="index,follow,max-image-preview:large" />')}
-  <meta name="theme-color" content="#F2ECDE" />
-  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#14100E" />
+  <meta name="color-scheme" content="dark light" />
 
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="${SITE.name}" />
@@ -159,13 +159,67 @@ function TopBar(): string {
 }
 
 function Header(categories: Category[]): string {
-  const catLinks = categories
-    .map(
-      (c) =>
-        `<a href="/category/${c.slug}" class="block px-3 py-2.5 text-ink-soft hover:text-accent hover:bg-panel rounded transition text-sm">
-          <i class="${c.icon || 'fas fa-tag'} mr-2.5 text-ink-faint w-4 text-center"></i>${c.name}
-        </a>`
-    )
+  // Mega-menu, cleanly aligned:
+  //  • Categories WITH sub-categories (e.g. Fashion) become a full "section"
+  //    spanning the menu, with each sub-category (Men's/Women's) as its own
+  //    aligned column and its leaves listed beneath.
+  //  • Simple leaf categories (Tech, Home & Kitchen, …) are gathered into one
+  //    tidy "Browse all" grid at the bottom so nothing looks ragged.
+  const parents = categories.filter((c) => (c.children || []).length)
+  const leaves = categories.filter((c) => !(c.children || []).length)
+
+  const parentSections = parents
+    .map((c) => {
+      const cols = (c.children || [])
+        .map((k) => {
+          const grand = k.children || []
+          const links = grand.length
+            ? `<div class="megamenu__links">${grand
+                .map((g) => `<a href="/category/${g.slug}" class="megamenu__link">${g.name}</a>`)
+                .join('')}</div>`
+            : ''
+          return `<div class="megamenu__col">
+            <a href="/category/${k.slug}" class="megamenu__colhead">${k.icon ? `<i class="${k.icon}"></i>` : ''}<span>${k.name}</span></a>
+            ${links}
+          </div>`
+        })
+        .join('')
+      return `<section class="megamenu__section">
+        <a href="/category/${c.slug}" class="megamenu__sectiontitle"><i class="${c.icon || 'fas fa-tag'}"></i>${c.name}<span class="megamenu__all">View all <i class="fas fa-arrow-right text-[0.6rem]"></i></span></a>
+        <div class="megamenu__cols">${cols}</div>
+      </section>`
+    })
+    .join('')
+
+  const leafGrid = leaves.length
+    ? `<section class="megamenu__section megamenu__section--leaves">
+        <div class="megamenu__sectiontitle megamenu__sectiontitle--plain">More categories</div>
+        <div class="megamenu__leafgrid">
+          ${leaves
+            .map(
+              (c) => `<a href="/category/${c.slug}" class="megamenu__leaf"><i class="${c.icon || 'fas fa-tag'}"></i><span>${c.name}</span></a>`
+            )
+            .join('')}
+        </div>
+      </section>`
+    : ''
+
+  const catLinks = `${parentSections}${leafGrid}`
+
+  // Mobile: a flat, indented accordion of categories + subcategories.
+  const mobileCatLinks = categories
+    .map((c) => {
+      const kids = c.children || []
+      const subs = kids
+        .map((k) => {
+          const grand = (k.children || [])
+            .map((g) => `<a href="/category/${g.slug}" class="mobile-sublink mobile-sublink--deep">${g.name}</a>`)
+            .join('')
+          return `<a href="/category/${k.slug}" class="mobile-sublink">${k.icon ? `<i class="${k.icon} mr-2 text-ink-faint"></i>` : ''}${k.name}</a>${grand}`
+        })
+        .join('')
+      return `<a href="/category/${c.slug}" class="mobile-link mobile-link--cat"><i class="${c.icon || 'fas fa-tag'} mr-2.5 text-ink-faint"></i>${c.name}</a>${subs}`
+    })
     .join('')
 
   return `
@@ -184,7 +238,7 @@ function Header(categories: Category[]): string {
           <div class="relative nav-dropdown">
             <button class="nav-link flex items-center gap-1.5" aria-haspopup="true" aria-expanded="false">Categories <i class="fas fa-chevron-down text-[0.6rem] transition-transform duration-300 nav-caret"></i></button>
             <div class="nav-menu absolute left-1/2 -translate-x-1/2 top-full pt-3">
-              <div class="bg-surface shadow-[0_24px_60px_-26px_rgba(0,0,0,0.45)] rounded-2xl border border-line p-2 min-w-[240px]">${catLinks}</div>
+              <div class="megamenu bg-surface shadow-[0_24px_60px_-26px_rgba(0,0,0,0.45)] rounded-2xl border border-line p-4">${catLinks}</div>
             </div>
           </div>
           <a href="/best" class="nav-link">Best Of</a>
@@ -211,7 +265,7 @@ function Header(categories: Category[]): string {
         <a href="/guides" class="mobile-link">Buying Guides</a>
         <details class="mobile-cats">
           <summary class="mobile-link flex items-center justify-between cursor-pointer">Categories <i class="fas fa-chevron-down text-[0.7rem] transition-transform"></i></summary>
-          <div class="pt-1 pl-1">${catLinks}</div>
+          <div class="pt-1 pl-1">${mobileCatLinks}</div>
         </details>
         <form action="/search" method="get" class="search-bar search-bar--mobile flex items-center mt-3" role="search">
           <i class="fas fa-search search-icon"></i>

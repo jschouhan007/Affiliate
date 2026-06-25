@@ -1,10 +1,63 @@
 import type { Category, Deal, Post, Offer, Faq, Hub } from '../types'
 
-export async function getCategories(db: D1Database): Promise<Category[]> {
+// All categories (flat), ordered. Includes nested ones.
+export async function getAllCategories(db: D1Database): Promise<Category[]> {
   const { results } = await db
     .prepare('SELECT * FROM categories ORDER BY sort_order, name')
     .all<Category>()
   return results || []
+}
+
+// Top-level categories (parent_id IS NULL), each with its `children` (and
+// grandchildren) attached, ordered. Used everywhere (nav, footer, ribbon) so
+// the mega-menu can render Fashion's subcategories without extra queries.
+export async function getCategories(db: D1Database): Promise<Category[]> {
+  return await getCategoryTree(db)
+}
+
+// Top-level categories with their nested children attached (a tree). Used for
+// the mega-menu / category ribbon and the filter's category facet.
+export async function getCategoryTree(db: D1Database): Promise<Category[]> {
+  const all = await getAllCategories(db)
+  const byId = new Map<number, Category>()
+  for (const c of all) { c.children = []; byId.set(c.id, c) }
+  const roots: Category[] = []
+  for (const c of all) {
+    if (c.parent_id != null && byId.has(c.parent_id)) byId.get(c.parent_id)!.children!.push(c)
+    else roots.push(c)
+  }
+  return roots
+}
+
+// Direct children of a category.
+export async function getChildCategories(db: D1Database, parentId: number): Promise<Category[]> {
+  const { results } = await db
+    .prepare('SELECT * FROM categories WHERE parent_id = ? ORDER BY sort_order, name')
+    .bind(parentId)
+    .all<Category>()
+  return results || []
+}
+
+// All descendant category IDs (self + children + grandchildren). Used so that
+// browsing "Fashion" shows products from Men/Women and all their subcategories.
+export async function getDescendantCategoryIds(db: D1Database, rootId: number): Promise<number[]> {
+  const all = await getAllCategories(db)
+  const childrenOf = new Map<number, number[]>()
+  for (const c of all) {
+    if (c.parent_id != null) {
+      if (!childrenOf.has(c.parent_id)) childrenOf.set(c.parent_id, [])
+      childrenOf.get(c.parent_id)!.push(c.id)
+    }
+  }
+  const out: number[] = []
+  const stack = [rootId]
+  while (stack.length) {
+    const id = stack.pop()!
+    out.push(id)
+    const kids = childrenOf.get(id)
+    if (kids) for (const k of kids) stack.push(k)
+  }
+  return out
 }
 
 export async function getCategoryBySlug(
@@ -15,6 +68,58 @@ export async function getCategoryBySlug(
     .prepare('SELECT * FROM categories WHERE slug = ?')
     .bind(slug)
     .first<Category>()
+}
+
+export async function getCategoryById(db: D1Database, id: number): Promise<Category | null> {
+  return await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first<Category>()
+}
+
+export async function categorySlugExists(db: D1Database, slug: string, exceptId?: number): Promise<boolean> {
+  const row = exceptId
+    ? await db.prepare('SELECT 1 FROM categories WHERE slug = ? AND id != ?').bind(slug, exceptId).first()
+    : await db.prepare('SELECT 1 FROM categories WHERE slug = ?').bind(slug).first()
+  return !!row
+}
+
+// How many products + posts reference a category (used before delete).
+export async function getCategoryUsage(db: D1Database, id: number): Promise<{ deals: number; posts: number; children: number }> {
+  const deals = (await db.prepare('SELECT COUNT(*) AS n FROM deals WHERE category_id = ?').bind(id).first<{ n: number }>())?.n || 0
+  const posts = (await db.prepare('SELECT COUNT(*) AS n FROM posts WHERE category_id = ?').bind(id).first<{ n: number }>())?.n || 0
+  const children = (await db.prepare('SELECT COUNT(*) AS n FROM categories WHERE parent_id = ?').bind(id).first<{ n: number }>())?.n || 0
+  return { deals, posts, children }
+}
+
+export interface CategoryInput {
+  slug: string
+  name: string
+  icon?: string | null
+  description?: string | null
+  parent_id?: number | null
+  sort_order?: number
+}
+
+export async function createCategory(db: D1Database, c: CategoryInput): Promise<number> {
+  const res = await db
+    .prepare('INSERT INTO categories (slug, name, icon, description, parent_id, sort_order) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(c.slug, c.name, c.icon || null, c.description || null, c.parent_id ?? null, c.sort_order ?? 0)
+    .run()
+  return res.meta.last_row_id as number
+}
+
+export async function updateCategory(db: D1Database, id: number, c: CategoryInput): Promise<void> {
+  await db
+    .prepare('UPDATE categories SET slug = ?, name = ?, icon = ?, description = ?, parent_id = ?, sort_order = ? WHERE id = ?')
+    .bind(c.slug, c.name, c.icon || null, c.description || null, c.parent_id ?? null, c.sort_order ?? 0, id)
+    .run()
+}
+
+// Delete a category. Re-points its products & posts to NULL (uncategorised) and
+// promotes any direct children to top-level so nothing is orphaned by the FK.
+export async function deleteCategory(db: D1Database, id: number): Promise<void> {
+  await db.prepare('UPDATE deals SET category_id = NULL WHERE category_id = ?').bind(id).run()
+  await db.prepare('UPDATE posts SET category_id = NULL WHERE category_id = ?').bind(id).run()
+  await db.prepare('UPDATE categories SET parent_id = NULL WHERE parent_id = ?').bind(id).run()
+  await db.prepare('DELETE FROM categories WHERE id = ?').bind(id).run()
 }
 
 export async function getOffersForDeal(
@@ -42,11 +147,14 @@ const DEAL_SELECT = `
 
 export async function getDeals(
   db: D1Database,
-  opts: { categoryId?: number; featured?: boolean; limit?: number; offset?: number } = {}
+  opts: { categoryId?: number; categoryIds?: number[]; featured?: boolean; limit?: number; offset?: number } = {}
 ): Promise<Deal[]> {
   let sql = DEAL_SELECT + ' WHERE d.published = 1'
   const binds: unknown[] = []
-  if (opts.categoryId) {
+  if (opts.categoryIds && opts.categoryIds.length) {
+    sql += ` AND d.category_id IN (${opts.categoryIds.map(() => '?').join(',')})`
+    binds.push(...opts.categoryIds)
+  } else if (opts.categoryId) {
     sql += ' AND d.category_id = ?'
     binds.push(opts.categoryId)
   }

@@ -1,4 +1,5 @@
 import { formatPrice, discountPct, retailerMeta, timeAgo, formatDate } from '../lib/format'
+import { SITE } from '../types'
 import type { Deal, Offer, Post } from '../types'
 
 // ---- Minimalist rating stars ----
@@ -163,6 +164,29 @@ export function HeroCarousel(deals: Deal[], sourcePath = '/'): string {
   </section>`
 }
 
+// ---- Share bar (Instagram-first) ----
+// Instagram has no public "share to chat/story" web URL, so we use the native
+// Web Share API (mobile shows Instagram Chats/Stories in the share sheet) with a
+// graceful "copy link + open Instagram" fallback on desktop. The button is
+// wired up by app.js via the data-share-* attributes.
+export function ShareBar(deal: Deal): string {
+  const url = `${SITE.url.replace(/\/$/, '')}/reviews/${deal.slug}`
+  const text = `${deal.title} — check this out on ${SITE.name}`
+  return `<div class="sharebar" data-share data-share-url="${escapeAttr(url)}" data-share-title="${escapeAttr(deal.title)}" data-share-text="${escapeAttr(text)}">
+    <span class="sharebar__label">Share</span>
+    <button type="button" class="sharebar__btn sharebar__btn--ig" data-share-ig aria-label="Share on Instagram" title="Share on Instagram">
+      <i class="fab fa-instagram"></i><span class="sharebar__btntext">Instagram</span>
+    </button>
+    <button type="button" class="sharebar__btn sharebar__btn--more" data-share-native aria-label="More sharing options" title="More options">
+      <i class="fas fa-share-nodes"></i>
+    </button>
+    <button type="button" class="sharebar__btn sharebar__btn--copy" data-share-copy aria-label="Copy link" title="Copy link">
+      <i class="fas fa-link"></i>
+    </button>
+    <span class="sharebar__toast" data-share-toast hidden>Link copied!</span>
+  </div>`
+}
+
 // ---- Price comparison box (editorial, hairline rows) ----
 export function PriceBox(deal: Deal, sourcePath: string): string {
   const offers = (deal.offers || []).slice().sort((a, b) => (a.price ?? 1e12) - (b.price ?? 1e12))
@@ -190,8 +214,7 @@ export function PriceBox(deal: Deal, sourcePath: string): string {
   return `<div class="card p-5">
       <div class="eyebrow eyebrow-mute mb-1">Where to buy</div>
       ${rows}
-    </div>
-    <p class="text-xs text-ink-faint mt-3 flex items-center gap-1.5"><i class="fas fa-circle-info"></i>Prices verified ${timeAgo(deal.updated_at)}. We may earn a commission — at no cost to you.</p>`
+    </div>`
 }
 
 // ---- Editor's Pick card (dual CTAs, zoom image, lift + glow) ----

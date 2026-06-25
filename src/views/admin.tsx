@@ -67,6 +67,7 @@ function topbar(active: string): string {
       <nav class="flex items-center gap-5 text-sm">
         <a href="/admin" class="${active === 'dash' ? 'text-[#818CF8]' : 'text-[#CBD5E6] hover:text-white'}">Posts</a>
         <a href="/admin/products" class="${active === 'products' ? 'text-[#818CF8]' : 'text-[#CBD5E6] hover:text-white'}">Products</a>
+        <a href="/admin/categories" class="${active === 'categories' ? 'text-[#818CF8]' : 'text-[#CBD5E6] hover:text-white'}">Categories</a>
         <a href="/admin/carousel" class="${active === 'carousel' ? 'text-[#818CF8]' : 'text-[#CBD5E6] hover:text-white'}">Carousel</a>
         <a href="/admin/new" class="${active === 'new' ? 'text-[#818CF8]' : 'text-[#CBD5E6] hover:text-white'}">New post</a>
         <a href="/" target="_blank" class="text-[#CBD5E6] hover:text-white">View site <i class="fas fa-arrow-up-right-from-square text-[0.6rem]"></i></a>
@@ -196,9 +197,7 @@ export function AdminDashboard(data: { posts: Post[]; flash?: string }) {
 export function AdminEditor(data: { post?: Post; categories: Category[]; error?: string }) {
   const p = data.post
   const isEdit = !!p
-  const catOpts = data.categories
-    .map((c) => `<option value="${c.id}" ${p && p.category_id === c.id ? 'selected' : ''}>${c.name}</option>`)
-    .join('')
+  const catSelect = categorySelect(data.categories, p ? p.category_id : null, { name: 'category_id' })
 
   const typeOpts = ['blog', 'review', 'comparison', 'guide']
     .map((t) => `<option value="${t}" ${p && p.post_type === t ? 'selected' : ''}>${t}</option>`)
@@ -241,7 +240,7 @@ export function AdminEditor(data: { post?: Post; categories: Category[]; error?:
       <div class="grid sm:grid-cols-3 gap-4">
         <div>
           <label class="ad-label">Category</label>
-          <select name="category_id" class="ad-input"><option value="">— None —</option>${catOpts}</select>
+          ${catSelect}
         </div>
         <div>
           <label class="ad-label">Type</label>
@@ -357,6 +356,59 @@ function escapeHtml(s: string): string {
 }
 function escapeAttr(s: string): string {
   return String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string))
+}
+
+// Build a hierarchical <select> for choosing a category. Accepts EITHER a flat
+// list (with parent_id) OR a tree (roots with .children) — it normalises to a
+// flat ordered list, then renders parents as bold headings and their children
+// indented underneath, so admins can clearly pick a leaf subcategory.
+function flattenCategories(cats: Category[]): { cat: Category; depth: number }[] {
+  // Detect tree vs flat: if any node has children we treat the input as a tree.
+  const hasTree = cats.some((c) => Array.isArray((c as any).children) && (c as any).children!.length)
+  const out: { cat: Category; depth: number }[] = []
+  if (hasTree) {
+    const walk = (list: Category[], depth: number) => {
+      for (const c of list) {
+        out.push({ cat: c, depth })
+        if (c.children && c.children.length) walk(c.children, depth + 1)
+      }
+    }
+    walk(cats, 0)
+    return out
+  }
+  // Flat list with parent_id → reconstruct ordering (roots, then their kids).
+  const byParent = new Map<number | null, Category[]>()
+  for (const c of cats) {
+    const key = c.parent_id ?? null
+    if (!byParent.has(key)) byParent.set(key, [])
+    byParent.get(key)!.push(c)
+  }
+  const walk = (parent: number | null, depth: number) => {
+    for (const c of byParent.get(parent) || []) {
+      out.push({ cat: c, depth })
+      walk(c.id, depth + 1)
+    }
+  }
+  walk(null, 0)
+  // Any category whose parent_id points outside the set falls through as a root.
+  if (!out.length) for (const c of cats) out.push({ cat: c, depth: 0 })
+  return out
+}
+
+function categorySelect(cats: Category[], selectedId?: number | null, opts: { name?: string; allowNone?: boolean } = {}): string {
+  const name = opts.name || 'category_id'
+  const flat = flattenCategories(cats)
+  const none = opts.allowNone === false ? '' : `<option value="" ${selectedId == null ? 'selected' : ''}>— None —</option>`
+  const options = flat
+    .map(({ cat, depth }) => {
+      const indent = depth === 0 ? '' : depth === 1 ? '\u00A0\u00A0└\u00A0' : '\u00A0\u00A0\u00A0\u00A0└\u00A0'
+      const isParent = flat.some((f) => f.cat.parent_id === cat.id)
+      const label = `${indent}${escapeHtml(cat.name)}${isParent && depth === 0 ? '' : ''}`
+      const style = depth === 0 && isParent ? ' style="font-weight:600"' : ''
+      return `<option value="${cat.id}" ${selectedId === cat.id ? 'selected' : ''}${style}>${label}</option>`
+    })
+    .join('')
+  return `<select name="${name}" class="ad-input">${none}${options}</select>`
 }
 
 // Cheapest offer = best price (mirrors the public-site logic)
@@ -496,9 +548,7 @@ export function AdminProducts(data: { deals: Deal[]; flash?: string }) {
 export function AdminProductEditor(data: { deal?: Deal; categories: Category[]; error?: string }) {
   const d = data.deal
   const isEdit = !!d
-  const catOpts = data.categories
-    .map((c) => `<option value="${c.id}" ${d && d.category_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`)
-    .join('')
+  const catSelect = categorySelect(data.categories, d ? d.category_id : null, { name: 'category_id' })
 
   // Existing offers (with their buy URLs) become editable rows.
   const offers = (d?.offers || []).map((o) => ({
@@ -539,7 +589,7 @@ export function AdminProductEditor(data: { deal?: Deal; categories: Category[]; 
         </div>
       </div>
       <div class="mt-3">
-        <label class="ad-label">Buy Now link <span class="text-[#7A87A0] normal-case">(real product / affiliate URL)</span></label>
+        <label class="ad-label">Buy Now link <span class="text-[#7A87A0] normal-case">(direct product page URL)</span></label>
         <input name="offer_url" class="ad-input" value="${escapeAttr(o.buy_url)}" placeholder="https://www.amazon.in/dp/XXXXXXXX?tag=yourtag-21" />
       </div>
     </div>`
@@ -594,7 +644,7 @@ export function AdminProductEditor(data: { deal?: Deal; categories: Category[]; 
       <div class="grid sm:grid-cols-3 gap-4">
         <div>
           <label class="ad-label">Category</label>
-          <select name="category_id" class="ad-input"><option value="">— None —</option>${catOpts}</select>
+          ${catSelect}
         </div>
         <div>
           <label class="ad-label">Our rating (0–5)</label>
@@ -882,4 +932,119 @@ function chosenRow(d: Deal): string {
     </div>
     <button type="button" class="chosen-remove text-[#F87171] hover:text-red-300 text-sm shrink-0"><i class="fas fa-times"></i></button>
   </div>`
+}
+
+// ============ CATEGORIES MANAGER ============
+export interface AdminCategoryRow {
+  id: number
+  slug: string
+  name: string
+  icon?: string | null
+  parent_id?: number | null
+  sort_order?: number
+  deals: number
+  posts: number
+  depth: number
+}
+
+export function AdminCategories(data: { rows: AdminCategoryRow[]; flash?: string; error?: string; editId?: number }) {
+  const roots = data.rows.filter((r) => r.depth === 0)
+  const totalCats = data.rows.length
+  const totalSub = data.rows.filter((r) => r.depth > 0).length
+
+  // Parent <select> for the add/edit forms — only roots & their direct children
+  // can be parents (we keep the tree at most 3 levels deep: root → sub → leaf).
+  const parentOptions = (selected?: number | null, excludeId?: number) => {
+    const opts = data.rows
+      .filter((r) => r.id !== excludeId && r.depth < 2)
+      .map((r) => {
+        const indent = r.depth === 0 ? '' : '\u00A0\u00A0└\u00A0'
+        return `<option value="${r.id}" ${selected === r.id ? 'selected' : ''}>${indent}${escapeHtml(r.name)}</option>`
+      })
+      .join('')
+    return `<option value="" ${selected == null ? 'selected' : ''}>— Top level —</option>${opts}`
+  }
+
+  const rowHtml = (r: AdminCategoryRow) => {
+    const pad = r.depth === 0 ? 0 : r.depth === 1 ? 1.5 : 3
+    const icon = r.icon ? `<i class="${escapeAttr(r.icon)} w-4 text-center" style="color:#818CF8"></i>` : '<i class="fas fa-folder w-4 text-center text-[#566080]"></i>'
+    const isEditing = data.editId === r.id
+    if (isEditing) {
+      return `<tr class="border-t border-[#28324A] bg-[#101624]">
+        <td colspan="5" class="px-5 py-4">
+          <form method="post" action="/admin/categories/edit/${r.id}" class="grid sm:grid-cols-12 gap-3 items-end">
+            <div class="sm:col-span-3"><label class="ad-label">Name</label><input name="name" required class="ad-input" value="${escapeAttr(r.name)}" /></div>
+            <div class="sm:col-span-3"><label class="ad-label">Slug</label><input name="slug" required class="ad-input" value="${escapeAttr(r.slug)}" /></div>
+            <div class="sm:col-span-2"><label class="ad-label">Icon</label><input name="icon" class="ad-input" value="${escapeAttr(r.icon || '')}" placeholder="fas fa-shirt" /></div>
+            <div class="sm:col-span-2"><label class="ad-label">Parent</label><select name="parent_id" class="ad-input">${parentOptions(r.parent_id, r.id)}</select></div>
+            <div class="sm:col-span-1"><label class="ad-label">Order</label><input name="sort_order" type="number" class="ad-input" value="${r.sort_order ?? 0}" /></div>
+            <div class="sm:col-span-1 flex gap-2">
+              <button type="submit" class="ad-primary ad-btn !px-3"><i class="fas fa-check"></i></button>
+              <a href="/admin/categories" class="ad-btn ad-line !px-3">✕</a>
+            </div>
+          </form>
+        </td>
+      </tr>`
+    }
+    return `<tr class="border-t border-[#28324A] hover:bg-[#101624] transition">
+      <td class="py-3 px-5">
+        <div class="flex items-center gap-2.5" style="padding-left:${pad}rem">
+          ${r.depth > 0 ? '<span class="text-[#566080] text-xs">└</span>' : ''}
+          ${icon}
+          <span class="font-medium text-[#EDF2FA] ${r.depth === 0 ? '' : 'text-sm'}">${escapeHtml(r.name)}</span>
+        </div>
+      </td>
+      <td class="py-3 pr-3"><a href="/category/${r.slug}" target="_blank" class="text-xs text-[#9BA8C0] hover:text-[#818CF8]">/${escapeHtml(r.slug)}</a></td>
+      <td class="py-3 pr-3 text-sm text-[#CBD5E6] text-center">${r.deals}</td>
+      <td class="py-3 pr-3 text-sm text-[#CBD5E6] text-center">${r.posts}</td>
+      <td class="py-3 px-5 text-right whitespace-nowrap">
+        <a href="/admin/categories?edit=${r.id}" class="ad-btn ad-line !py-1.5 !px-2.5 text-xs">Edit</a>
+        <form method="post" action="/admin/categories/delete/${r.id}" class="inline" onsubmit="return confirm('Delete &quot;${escapeAttr(r.name)}&quot;? Its products &amp; posts become Uncategorised and any sub-categories move to the top level.')">
+          <button title="Delete" class="ad-btn ad-danger !py-1.5 !px-2.5 text-xs ml-1"><i class="fas fa-trash"></i></button>
+        </form>
+      </td>
+    </tr>`
+  }
+
+  const rows = data.rows.map(rowHtml).join('')
+
+  const body = `${topbar('categories')}
+  <main class="max-w-5xl mx-auto px-5 py-10">
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-8">
+      <div>
+        <h1 class="text-3xl">Categories</h1>
+        <p class="text-[#9BA8C0] text-sm mt-1">Organise the store. Parents (Fashion), sub-categories (Men's) &amp; leaves (T-Shirts) build the site nav &amp; filters.</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+      <div class="card p-5"><div class="flex items-center justify-between"><div><div class="text-3xl font-semibold" style="font-family:'Playfair Display',serif">${roots.length}</div><div class="text-xs text-[#9BA8C0] uppercase tracking-wider mt-1">Top level</div></div><i class="fas fa-folder-tree text-xl" style="color:#8ab4f8"></i></div></div>
+      <div class="card p-5"><div class="flex items-center justify-between"><div><div class="text-3xl font-semibold" style="font-family:'Playfair Display',serif">${totalSub}</div><div class="text-xs text-[#9BA8C0] uppercase tracking-wider mt-1">Sub-categories</div></div><i class="fas fa-sitemap text-xl" style="color:#818CF8"></i></div></div>
+      <div class="card p-5"><div class="flex items-center justify-between"><div><div class="text-3xl font-semibold" style="font-family:'Playfair Display',serif">${totalCats}</div><div class="text-xs text-[#9BA8C0] uppercase tracking-wider mt-1">Total</div></div><i class="fas fa-tags text-xl" style="color:#34d399"></i></div></div>
+    </div>
+
+    <!-- Add new category -->
+    <section class="card p-6 mb-8">
+      <div class="flex items-center gap-2.5 mb-4"><i class="fas fa-plus" style="color:#818CF8"></i><h2 class="text-xl">Add a category</h2></div>
+      <form method="post" action="/admin/categories/new" class="grid sm:grid-cols-12 gap-3 items-end">
+        <div class="sm:col-span-3"><label class="ad-label">Name *</label><input name="name" required class="ad-input" placeholder="Footwear" oninput="var s=this.form.querySelector('[name=slug]');if(s&&!s.dataset.touched){s.value=this.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}" /></div>
+        <div class="sm:col-span-3"><label class="ad-label">Slug *</label><input name="slug" required class="ad-input" placeholder="footwear" oninput="this.dataset.touched='1'" /></div>
+        <div class="sm:col-span-2"><label class="ad-label">Icon <span class="text-[#7A87A0] normal-case">(FA)</span></label><input name="icon" class="ad-input" placeholder="fas fa-shoe-prints" /></div>
+        <div class="sm:col-span-2"><label class="ad-label">Parent</label><select name="parent_id" class="ad-input">${parentOptions(null)}</select></div>
+        <div class="sm:col-span-1"><label class="ad-label">Order</label><input name="sort_order" type="number" class="ad-input" value="0" /></div>
+        <div class="sm:col-span-1"><button type="submit" class="ad-primary ad-btn w-full justify-center"><i class="fas fa-plus"></i></button></div>
+      </form>
+      <p class="text-xs text-[#7A87A0] mt-3">Tip: find icon names at <span class="text-[#9BA8C0]">fontawesome.com/icons</span> — e.g. <code>fas fa-shoe-prints</code>, <code>fas fa-shirt</code>, <code>fas fa-mobile-screen</code>.</p>
+    </section>
+
+    <div class="card overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-[#9BA8C0] text-xs uppercase tracking-wider"><th class="py-3 px-5">Category</th><th>Slug</th><th class="text-center">Products</th><th class="text-center">Posts</th><th class="px-5 text-right">Actions</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="5" class="py-12 text-center text-[#9BA8C0]">No categories yet.</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  </main>`
+  return shell('Categories', body, { flash: data.flash, error: data.error })
 }

@@ -14,13 +14,13 @@ import {
   FaqSection,
   NewsletterBox,
   SectionHeader,
-  AffiliateNotice,
   Byline,
   TestedBadge,
   stars,
   HeroCarousel,
   CatalogueGrid,
   RecommendationStrip,
+  ShareBar,
 } from './components'
 
 // ============================================================
@@ -175,16 +175,22 @@ export function DealsPage(data: { deals: Deal[]; title: string; subtitle?: strin
 // ============================================================
 // CATEGORY
 // ============================================================
-export function CategoryPage(data: { category: Category; deals: Deal[]; pillars: Post[] }): string {
-  const { category, deals } = data
-  // Clean category page: a slim title, then ONLY the sortable + paginated
-  // catalogue grid. No guide cards, no facet sidebar, no extra intro blocks.
+export function CategoryPage(data: { category: Category; deals: Deal[]; pillars: Post[]; children?: Category[] }): string {
+  const { category, deals, children = [] } = data
+  // Clean category page: a slim title + (if it has subcategories) a row of
+  // sub-category pills, then the sortable + paginated catalogue grid.
+  const subnav = children.length
+    ? `<nav class="cat-subnav" aria-label="Subcategories">
+         ${children.map((ch) => `<a href="/category/${ch.slug}" class="cat-subnav__chip">${ch.icon ? `<i class="${ch.icon}"></i>` : ''}${ch.name}</a>`).join('')}
+       </nav>`
+    : ''
   return `<div class="max-w-editorial mx-auto px-5 pt-10 pb-2">
     ${Breadcrumbs([{ name: 'Home', url: '/' }, { name: 'Categories', url: '/deals' }, { name: category.name }])}
     <header class="text-center mb-2">
       <div class="eyebrow eyebrow-mute mb-2 flex items-center justify-center gap-2"><i class="${category.icon || 'fas fa-tag'}"></i> Category</div>
       <h1 class="font-serif text-4xl md:text-5xl text-ink leading-tight">${category.name}</h1>
     </header>
+    ${subnav}
   </div>
   ${CatalogueGrid(deals, `/category/${category.slug}`)}`
 }
@@ -248,7 +254,7 @@ export function HubPage(data: { hub: Hub; deals: Deal[]; relatedHubs: Hub[]; sou
       ${hub.dek ? `<p class="mt-6 font-serif italic text-xl md:text-2xl text-ink-soft leading-relaxed">${hub.dek}</p>` : ''}
     </header>
 
-    ${hub.intro ? `<div class="max-w-reading mb-12">${AffiliateNotice()}<div class="prose-area">${renderMarkdown(hub.intro)}</div></div>` : AffiliateNotice()}
+    ${hub.intro ? `<div class="max-w-reading mb-12"><div class="prose-area">${renderMarkdown(hub.intro)}</div></div>` : ''}
 
     ${deals.length ? `
     <!-- At a glance: comparison matrix (lazy-revealed) -->
@@ -351,6 +357,7 @@ export function ReviewPage(data: {
           ${cheapest.original_price && disc ? `<span class="text-base line-through text-ink-faint">${formatPrice(cheapest.original_price, cheapest.currency)}</span>` : ''}
         </div>` : ''}
         <div class="mt-5">${PriceBox(deal, sourcePath)}</div>
+        <div class="mt-5">${ShareBar(deal)}</div>
       </div>
     </div>
 
@@ -431,7 +438,6 @@ export function PostPage(data: {
     ${post.cover_image ? `<div class="max-w-editorial mx-auto px-5 my-12"><img src="${post.cover_image}" alt="${post.title}" class="w-full rounded border border-line" /></div>` : '<div class="mt-12"></div>'}
 
     <div class="max-w-reading mx-auto px-5">
-      ${deals.length ? AffiliateNotice() : ''}
       <div class="prose-area dropcap">${renderMarkdown(post.body)}</div>
     </div>
 

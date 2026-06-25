@@ -93,7 +93,7 @@ ${SITE.name} exists to save you time and money. Every day, thousands of "deals" 
 
 ## How we stay honest
 
-We earn affiliate commissions when you buy through our links, which keeps the site free. But commissions **never** change our rankings or verdicts. We rate products on merit, and we tell you when something *isn't* worth your money. Read our full [Affiliate Disclosure](/affiliate-disclosure).
+Our recommendations are independent and based purely on merit. We rate products honestly — including the downsides — and we tell you when something *isn't* worth your money. Nothing changes our rankings or verdicts. For full transparency, read our [Disclosure](/affiliate-disclosure).
 
 ## Get in touch
 

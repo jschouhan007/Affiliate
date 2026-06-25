@@ -12,8 +12,8 @@
     if (toggle) toggle.setAttribute('aria-checked', t === 'dark' ? 'true' : 'false');
     if (themeMeta) themeMeta.setAttribute('content', t === 'dark' ? '#14100E' : '#F2ECDE');
   }
-  // sync meta to whatever the no-flash script already set
-  applyTheme(root.getAttribute('data-theme') || 'light');
+  // sync meta to whatever the no-flash script already set (default dark)
+  applyTheme(root.getAttribute('data-theme') || 'dark');
   if (toggle) {
     toggle.addEventListener('click', function () {
       applyTheme(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
@@ -316,6 +316,17 @@
       for (var i = 0; i < dots.length; i++) {
         dots[i].classList.toggle('is-active', i === index);
       }
+      // Mark the active slide so its inner content can fade/rise in (CSS).
+      // Re-trigger the entrance animation by toggling the class off → on.
+      for (var s = 0; s < slides.length; s++) {
+        slides[s].classList.toggle('is-active', s === index);
+      }
+      var active = slides[index];
+      if (active && !reduce) {
+        active.classList.remove('is-entering');
+        void active.offsetWidth; // force reflow to restart the animation
+        active.classList.add('is-entering');
+      }
       reflowActiveDot();
       if (fromUser) restart();
     }
@@ -324,7 +335,7 @@
     function prevSlide() { go(index - 1); }
 
     function start() {
-      if (reduce || count < 2) return;
+      if (count < 2) return;
       stop();
       timer = setInterval(nextSlide, delay);
     }
@@ -349,29 +360,34 @@
       })(d);
     }
 
-    // Pause on hover / focus, resume on leave
-    root.addEventListener('mouseenter', function () { stop(); root.classList.add('is-paused'); });
-    root.addEventListener('mouseleave', function () { root.classList.remove('is-paused'); start(); });
-    root.addEventListener('focusin', function () { stop(); });
-    root.addEventListener('focusout', function () { start(); });
-
-    // Pause when tab not visible
+    // NOTE: Autoplay must NEVER stop (per product requirement) — so we do NOT
+    // pause on hover or focus. We only pause when the browser tab is hidden
+    // (otherwise the queued ticks fire in a burst when the tab regains focus),
+    // and resume the moment it's visible again.
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden) stop(); else start();
+      if (document.hidden) stop(); else restart();
     });
 
-    // Touch / swipe support
-    var startX = 0, dx = 0, swiping = false;
+    // Touch / swipe support — autoplay keeps running; a swipe just nudges the
+    // index and re-syncs the timer (restart) so the next auto-advance is a full
+    // interval away (feels natural, never stalls).
+    var startX = 0, startY = 0, dx = 0, dy = 0, swiping = false;
     track.addEventListener('touchstart', function (e) {
-      startX = e.touches[0].clientX; dx = 0; swiping = true; stop();
+      startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+      dx = 0; dy = 0; swiping = true;
     }, { passive: true });
     track.addEventListener('touchmove', function (e) {
-      if (!swiping) return; dx = e.touches[0].clientX - startX;
+      if (!swiping) return;
+      dx = e.touches[0].clientX - startX;
+      dy = e.touches[0].clientY - startY;
     }, { passive: true });
     track.addEventListener('touchend', function () {
       if (!swiping) return; swiping = false;
-      if (Math.abs(dx) > 45) { if (dx < 0) nextSlide(); else prevSlide(); }
-      start();
+      // only treat as horizontal swipe if mostly horizontal
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+        if (dx < 0) nextSlide(); else prevSlide();
+        restart();
+      }
     });
 
     // Keyboard arrows when carousel focused
@@ -746,4 +762,60 @@
     updateArrows();
   }
   document.querySelectorAll('[data-reco]').forEach(initStrip);
+})();
+
+/* ── Product share bar (Instagram-first) ───────────────────────────────────── */
+(function () {
+  function initShare(bar) {
+    var url = bar.getAttribute('data-share-url') || window.location.href;
+    var title = bar.getAttribute('data-share-title') || document.title;
+    var text = bar.getAttribute('data-share-text') || title;
+    var igBtn = bar.querySelector('[data-share-ig]');
+    var nativeBtn = bar.querySelector('[data-share-native]');
+    var copyBtn = bar.querySelector('[data-share-copy]');
+    var toast = bar.querySelector('[data-share-toast]');
+
+    function showToast(msg) {
+      if (!toast) return;
+      toast.textContent = msg || 'Link copied!';
+      toast.hidden = false;
+      toast.classList.add('is-show');
+      setTimeout(function () { toast.classList.remove('is-show'); setTimeout(function(){ toast.hidden = true; }, 250); }, 1800);
+    }
+    function copyLink() {
+      var done = function () { showToast('Link copied!'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done, fallbackCopy);
+      } else { fallbackCopy(); }
+      function fallbackCopy() {
+        try {
+          var ta = document.createElement('textarea');
+          ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select();
+          document.execCommand('copy'); document.body.removeChild(ta); done();
+        } catch (e) { showToast('Copy failed — long-press the link'); }
+      }
+    }
+    function nativeShare() {
+      if (navigator.share) {
+        navigator.share({ title: title, text: text, url: url }).catch(function () {});
+        return true;
+      }
+      return false;
+    }
+    /* Instagram: on mobile the native share sheet exposes Instagram Chats &
+       Stories directly. On desktop (no native share) we copy the link and open
+       Instagram so the user can paste into a DM/story. */
+    if (igBtn) igBtn.addEventListener('click', function () {
+      if (nativeShare()) return;
+      copyLink();
+      showToast('Link copied — opening Instagram');
+      setTimeout(function () { window.open('https://www.instagram.com/', '_blank', 'noopener'); }, 500);
+    });
+    if (nativeBtn) nativeBtn.addEventListener('click', function () {
+      if (!nativeShare()) copyLink();
+    });
+    if (copyBtn) copyBtn.addEventListener('click', copyLink);
+  }
+  document.querySelectorAll('[data-share]').forEach(initShare);
 })();
