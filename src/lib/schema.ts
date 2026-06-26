@@ -158,3 +158,64 @@ export function itemListSchema(deals: Deal[], listUrl: string): string {
     })),
   })
 }
+
+// ItemPage schema: cleanly defines a page whose mainEntity is a list of
+// products (a comparison matrix). Nesting full Product nodes inside the
+// ItemList lets Google understand each compared item — price, brand, rating —
+// in one structured block. Used on the /compare matrix and any review page
+// that surfaces a multi-product comparison.
+export function itemPageSchema(
+  deals: Deal[],
+  pageUrl: string,
+  opts: { name?: string; description?: string } = {}
+): string {
+  const url = pageUrl.startsWith('http') ? pageUrl : `${SITE.url}${pageUrl}`
+  const productNode = (d: Deal) => {
+    const offers = (d.offers || []).filter((o) => o.price != null)
+    const lowest = offers.length ? Math.min(...offers.map((o) => o.price as number)) : undefined
+    const node: Record<string, unknown> = {
+      '@type': 'Product',
+      name: d.title,
+      url: `${SITE.url}/reviews/${d.slug}`,
+      image: d.image_url ? [d.image_url] : undefined,
+      brand: d.brand ? { '@type': 'Brand', name: d.brand } : undefined,
+      description: d.short_desc || d.description,
+    }
+    if (lowest != null) {
+      node.offers = {
+        '@type': 'AggregateOffer',
+        priceCurrency: SITE.currency,
+        lowPrice: lowest,
+        highPrice: Math.max(...offers.map((o) => o.price as number)),
+        offerCount: offers.length,
+        availability: 'https://schema.org/InStock',
+      }
+    }
+    if (d.rating && d.rating_count > 0) {
+      node.aggregateRating = {
+        '@type': 'AggregateRating',
+        ratingValue: d.rating,
+        reviewCount: d.rating_count,
+        bestRating: 5,
+        worstRating: 1,
+      }
+    }
+    return node
+  }
+  return json({
+    '@context': 'https://schema.org',
+    '@type': 'ItemPage',
+    url,
+    name: opts.name || 'Product comparison',
+    description: opts.description,
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: deals.length,
+      itemListElement: deals.map((d, idx) => ({
+        '@type': 'ListItem',
+        position: idx + 1,
+        item: productNode(d),
+      })),
+    },
+  })
+}

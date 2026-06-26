@@ -82,7 +82,7 @@ export function HomePage(data: {
         <!-- Lead story 60% -->
         <article class="lg:col-span-7 card group flex flex-col">
           <a href="/reviews/${lead.slug}" class="card-img block aspect-[16/10] bg-panel relative">
-            ${lead.image_url ? `<img src="${lead.image_url}" alt="${lead.title}" class="w-full h-full object-contain p-10" />` : ''}
+            ${lead.image_url ? `<img src="${lead.image_url}" alt="${lead.title}" loading="eager" decoding="async" fetchpriority="high" width="640" height="400" class="w-full h-full object-contain p-10" />` : ''}
             <span class="absolute top-5 left-5 pill pill-ink">${lead.award || "Editor's Pick"}</span>
           </a>
           <div class="p-8">
@@ -100,7 +100,7 @@ export function HomePage(data: {
           ${secondary
             .map(
               (d) => `<a href="/reviews/${d.slug}" class="group flex gap-5 items-center card p-4">
-            <div class="card-img w-28 h-28 bg-panel rounded shrink-0 overflow-hidden flex items-center justify-center">${d.image_url ? `<img src="${d.image_url}" alt="${d.title}" class="w-full h-full object-contain p-3" />` : ''}</div>
+            <div class="card-img w-28 h-28 bg-panel rounded shrink-0 overflow-hidden flex items-center justify-center">${d.image_url ? `<img src="${d.image_url}" alt="${d.title}" loading="lazy" decoding="async" width="112" height="112" class="w-full h-full object-contain p-3" />` : ''}</div>
             <div class="min-w-0">
               ${d.category_name ? `<div class="eyebrow text-[0.62rem] mb-1">${d.category_name}</div>` : ''}
               <h4 class="font-serif text-lg leading-snug text-ink line-clamp-2 group-hover:text-accent transition">${d.title}</h4>
@@ -340,7 +340,7 @@ export function ReviewPage(data: {
     <div class="grid lg:grid-cols-12 gap-12 items-start">
       <div class="lg:col-span-6">
         <div class="card p-10 aspect-square flex items-center justify-center bg-panel sticky top-28">
-          ${deal.image_url ? `<img src="${deal.image_url}" alt="${deal.title}" class="max-h-full object-contain" />` : `<i class="fas fa-box-open text-6xl text-ink-faint"></i>`}
+          ${deal.image_url ? `<img src="${deal.image_url}" alt="${deal.title}" loading="eager" decoding="async" fetchpriority="high" width="640" height="640" class="max-h-full object-contain" />` : `<i class="fas fa-box-open text-6xl text-ink-faint"></i>`}
         </div>
       </div>
       <div class="lg:col-span-6">
@@ -395,7 +395,7 @@ export function BlogIndexPage(data: { posts: Post[]; title: string; subtitle: st
     </header>
     ${!data.posts.length ? '<p class="text-ink-faint py-16 text-center">No stories published yet.</p>' : ''}
     ${hero ? `<a href="/blog/${hero.slug}" class="group grid lg:grid-cols-12 gap-10 items-center mb-20 pb-20 border-b border-line">
-      <div class="lg:col-span-7 card-img aspect-[16/10] bg-panel rounded overflow-hidden border border-line">${hero.cover_image ? `<img src="${hero.cover_image}" alt="${hero.title}" class="w-full h-full object-cover group-hover:scale-[1.03] transition duration-700" />` : `<div class="w-full h-full flex items-center justify-center text-ink-faint"><i class="fas fa-feather text-4xl"></i></div>`}</div>
+      <div class="lg:col-span-7 card-img aspect-[16/10] bg-panel rounded overflow-hidden border border-line">${hero.cover_image ? `<img src="${hero.cover_image}" alt="${hero.title}" loading="eager" decoding="async" fetchpriority="high" width="800" height="500" class="w-full h-full object-cover group-hover:scale-[1.03] transition duration-700" />` : `<div class="w-full h-full flex items-center justify-center text-ink-faint"><i class="fas fa-feather text-4xl"></i></div>`}</div>
       <div class="lg:col-span-5">
         <div class="eyebrow mb-4">${hero.pillar ? 'Buying Guide' : hero.category_name || 'Article'}</div>
         <h2 class="font-serif text-3xl md:text-4xl leading-tight text-ink mb-4 group-hover:text-accent transition">${hero.title}</h2>
@@ -435,7 +435,7 @@ export function PostPage(data: {
       </div>
     </div>
 
-    ${post.cover_image ? `<div class="max-w-editorial mx-auto px-5 my-12"><img src="${post.cover_image}" alt="${post.title}" class="w-full rounded border border-line" /></div>` : '<div class="mt-12"></div>'}
+    ${post.cover_image ? `<div class="max-w-editorial mx-auto px-5 my-12"><img src="${post.cover_image}" alt="${post.title}" loading="eager" decoding="async" fetchpriority="high" width="1200" height="630" class="w-full rounded border border-line" /></div>` : '<div class="mt-12"></div>'}
 
     <div class="max-w-reading mx-auto px-5">
       <div class="prose-area dropcap">${renderMarkdown(post.body)}</div>

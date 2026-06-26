@@ -123,7 +123,7 @@ export function HeroCarousel(deals: Deal[], sourcePath = '/'): string {
           <div class="hero-slide__media">
             ${d.award ? `<span class="hero-slide__badge">${d.award}</span>` : (d.featured ? `<span class="hero-slide__badge">Editor's Pick</span>` : '')}
             ${d.image_url
-              ? `<img src="${d.image_url}" alt="${d.title}" loading="${i === 0 ? 'eager' : 'lazy'}" referrerpolicy="no-referrer" class="hero-slide__img" onerror="this.style.display='none';this.parentElement.querySelector('.hero-slide__noimg')?.style.setProperty('display','flex')" />`
+              ? `<img src="${d.image_url}" alt="${d.title}" loading="${i === 0 ? 'eager' : 'lazy'}" decoding="async" ${i === 0 ? 'fetchpriority="high"' : ''} referrerpolicy="no-referrer" class="hero-slide__img" onerror="this.style.display='none';this.parentElement.querySelector('.hero-slide__noimg')?.style.setProperty('display','flex')" />`
               : ''}
             <div class="hero-slide__noimg" ${d.image_url ? 'style="display:none"' : ''}><i class="fas fa-box-open"></i></div>
             ${buyable
@@ -594,7 +594,7 @@ export function ComparisonTable(deals: Deal[], sourcePath: string): string {
         <td class="py-5 pr-3 align-top"><span class="font-serif text-xl text-accent">${idx + 1}</span></td>
         <td class="py-5 pr-3 align-top">
           <div class="flex items-center gap-3">
-            ${d.image_url ? `<img src="${d.image_url}" alt="${d.title}" loading="lazy" class="w-14 h-14 object-contain bg-panel rounded shrink-0" />` : ''}
+            ${d.image_url ? `<img src="${d.image_url}" alt="${d.title}" loading="lazy" decoding="async" width="56" height="56" class="w-14 h-14 object-contain bg-panel rounded shrink-0" />` : ''}
             <div>
               <a href="/reviews/${d.slug}" class="font-serif text-base text-ink hover:text-accent transition leading-snug">${d.title}</a>
               ${d.award ? `<div class="mt-1"><span class="pill pill-accent">${d.award}</span></div>` : ''}
@@ -637,7 +637,7 @@ export function PostCard(post: Post): string {
   return `<article class="card group flex flex-col h-full">
     <a href="/blog/${post.slug}" class="card-img block aspect-[16/10] bg-panel">
       ${post.cover_image
-        ? `<img src="${post.cover_image}" alt="${post.title}" loading="lazy" class="w-full h-full object-cover" />`
+        ? `<img src="${post.cover_image}" alt="${post.title}" loading="lazy" decoding="async" width="640" height="400" class="w-full h-full object-cover" />`
         : `<div class="w-full h-full flex items-center justify-center text-ink-faint"><i class="fas fa-feather text-3xl"></i></div>`}
     </a>
     <div class="p-6 flex flex-col flex-1">

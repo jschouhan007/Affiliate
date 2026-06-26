@@ -2,6 +2,72 @@
 (function () {
   'use strict';
 
+  // ============================================================
+  // FIRST-PARTY ATTRIBUTION (UTM + landing page)
+  // ------------------------------------------------------------
+  // Third-party cookies are dying, so we capture campaign attribution as
+  // first-party data. On the user's FIRST visit we record any utm_* params and
+  // the landing page into a first-party cookie (ds_attr) + localStorage. We
+  // keep it for the whole session so that when the user finally clicks an
+  // outbound /go/ link, the server reads the cookie and appends the UTMs to the
+  // destination — telling us exactly which article/campaign drove the click.
+  // We also preserve utm_* across internal navigation so they aren't lost.
+  (function attribution() {
+    var UTM = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+    var STORE = 'ds_attr';
+    function readCookie(name) {
+      var m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      return m ? decodeURIComponent(m[1]) : '';
+    }
+    function writeCookie(name, value, days) {
+      var exp = new Date(Date.now() + days * 864e5).toUTCString();
+      // SameSite=Lax so it rides along on top-level navigations (incl. /go/).
+      document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + exp + '; path=/; SameSite=Lax';
+    }
+    var params = new URLSearchParams(window.location.search);
+    var incoming = {};
+    var hasUtm = false;
+    UTM.forEach(function (k) { var v = params.get(k); if (v) { incoming[k] = v; hasUtm = true; } });
+
+    // Load any stored attribution (first-touch wins — don't overwrite).
+    var stored = {};
+    try {
+      var raw = localStorage.getItem(STORE) || readCookie(STORE);
+      if (raw) new URLSearchParams(raw).forEach(function (v, k) { stored[k] = v; });
+    } catch (e) {}
+
+    // First touch: only persist if we don't already have attribution stored.
+    if (hasUtm && !stored.utm_source && !stored.utm_campaign) {
+      incoming.landing = window.location.pathname;
+      var qs = new URLSearchParams(incoming).toString();
+      try { localStorage.setItem(STORE, qs); } catch (e) {}
+      writeCookie(STORE, qs, 30);
+      stored = incoming;
+    } else if (Object.keys(stored).length) {
+      // refresh the cookie from storage so the server can always read it
+      writeCookie(STORE, new URLSearchParams(stored).toString(), 30);
+    }
+
+    // Preserve utm_* across internal links so navigation never drops them.
+    if (stored.utm_source || stored.utm_campaign) {
+      var carry = {};
+      UTM.forEach(function (k) { if (stored[k]) carry[k] = stored[k]; });
+      document.addEventListener('click', function (e) {
+        var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+        if (!a) return;
+        var href = a.getAttribute('href') || '';
+        // only internal, non-/go, non-anchor links
+        if (!href || href[0] === '#' || /^https?:\/\//.test(href) || href.indexOf('/go/') === 0 || href.indexOf('mailto:') === 0) return;
+        try {
+          var u = new URL(href, window.location.origin);
+          if (u.origin !== window.location.origin) return;
+          Object.keys(carry).forEach(function (k) { if (!u.searchParams.has(k)) u.searchParams.set(k, carry[k]); });
+          a.setAttribute('href', u.pathname + u.search + u.hash);
+        } catch (err) {}
+      }, true);
+    }
+  })();
+
   // ---- Theme toggle ----
   var root = document.documentElement;
   var toggle = document.getElementById('theme-toggle');

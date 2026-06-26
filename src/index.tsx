@@ -9,6 +9,8 @@ import * as Admin from './views/admin'
 import * as Q from './lib/queries'
 import * as Schema from './lib/schema'
 import * as Auth from './lib/auth'
+import * as Outbound from './lib/outbound'
+import { getCookie } from 'hono/cookie'
 import {
   AFFILIATE_DISCLOSURE,
   PRIVACY_POLICY,
@@ -20,6 +22,42 @@ import {
 const app = new Hono<{ Bindings: Bindings }>()
 
 app.use('/api/*', cors())
+
+// ---- Edge caching + stale-while-revalidate -------------------------------
+// Cache public HTML at Cloudflare's edge so crawlers (and users) get a
+// millisecond TTFB, which preserves crawl budget. We use a short s-maxage with
+// a long stale-while-revalidate window: the edge serves cached HTML instantly
+// and refreshes it in the background, so content is never more than a few
+// minutes stale while TTFB stays tiny. Personalised / mutating routes
+// (admin, /go outbound, APIs, POSTs) are explicitly skipped and marked
+// no-store. The static asset handler below sets its own long-lived caching.
+app.use('*', async (c, next) => {
+  await next()
+  const p = c.req.path
+  const isPublicGet =
+    c.req.method === 'GET' &&
+    !p.startsWith('/admin') &&
+    !p.startsWith('/go/') &&
+    !p.startsWith('/api/') &&
+    !p.startsWith('/static/')
+  // Only set caching when the handler hasn't already chosen a policy.
+  if (!c.res.headers.get('Cache-Control')) {
+    if (isPublicGet && c.res.status === 200) {
+      // 5-min fresh at the edge, serve-stale-and-revalidate for 24h.
+      c.res.headers.set('Cache-Control', 'public, max-age=0, s-maxage=300, stale-while-revalidate=86400')
+    } else if (p.startsWith('/admin') || p.startsWith('/go/') || p.startsWith('/api/')) {
+      c.res.headers.set('Cache-Control', 'no-store')
+    }
+  }
+})
+
+// Static assets: hashed/long-lived. Cache hard at the edge + browser.
+app.use('/static/*', async (c, next) => {
+  await next()
+  if (!c.res.headers.get('Cache-Control')) {
+    c.res.headers.set('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800')
+  }
+})
 app.use('/static/*', serveStatic({ root: './public' }))
 app.get('/favicon.ico', (c) => c.redirect('/static/logo.svg', 301))
 
@@ -36,11 +74,22 @@ function page(c: any, opts: {
   noindex?: boolean
   status?: number
 }) {
+  // Dynamic canonicalization: always emit a self-referencing canonical pointing
+  // at the CLEAN path (no ?sort=, ?utm_*, ?from=, pagination, etc.). If a route
+  // doesn't pass one we derive it from the request path — and we defensively
+  // strip any query string so tracking/sorting params can never split ranking
+  // signals or create duplicate-content URLs.
+  let canonical = opts.canonical ?? c.req.path
+  if (canonical && !canonical.startsWith('http')) {
+    canonical = canonical.split('?')[0].split('#')[0]
+    if (canonical.length > 1) canonical = canonical.replace(/\/+$/, '') // no trailing slash (except root)
+    if (!canonical) canonical = '/'
+  }
   const doc = Layout({
     title: opts.title,
     description: opts.description,
     keywords: opts.keywords,
-    canonical: opts.canonical,
+    canonical,
     ogImage: opts.ogImage,
     jsonLd: opts.jsonLd,
     categories: opts.categories,
@@ -190,10 +239,19 @@ app.get('/compare', async (c) => {
     .slice(0, 4)
   const deals = ids.length ? await Q.getDealsByIds(db, ids) : []
   const body = Pages.ComparePage({ deals, sourcePath: '/compare' })
+  const jsonLd = deals.length
+    ? [
+        Schema.itemPageSchema(deals, '/compare', {
+          name: 'Product comparison',
+          description: 'Side-by-side comparison of products — price, rating, specs and features.',
+        }),
+      ]
+    : []
   return page(c, {
     title: 'Compare Products',
     description: 'Compare products side by side — price, rating, specs and features.',
     canonical: '/compare',
+    jsonLd,
     body,
     categories,
     noindex: true,
@@ -357,20 +415,50 @@ app.get('/go/:slug', async (c) => {
   const ua = c.req.header('user-agent') || ''
   const country = (c.req.raw as any).cf?.country || c.req.header('cf-ipcountry') || ''
 
-  // Log click (don't block redirect on failure)
+  // ---- First-party attribution -------------------------------------------
+  // Read the UTM/landing data app.js persisted in our first-party cookie on the
+  // user's first visit, and append it to the destination so attribution
+  // survives the outbound hop.
+  const attr = Outbound.parseAttributionCookie(getCookie(c, 'ds_attr'))
+  attr.from = from
+  const destWithAttr = Outbound.appendAttribution(link.dest_url, attr)
+
+  // ---- Mobile deep linking ------------------------------------------------
+  const device = Outbound.detectDevice(ua)
+  const retailer = Outbound.detectRetailer(destWithAttr, link.retailer)
+  const { app: appLink, web } = Outbound.buildDeepLinks(destWithAttr, retailer, device)
+  const useDeepLink = Outbound.isMobile(device) && !!appLink
+
+  // Log click with attribution (never block the redirect on a logging failure)
   c.executionCtx.waitUntil(
     db
       .prepare(
-        `INSERT INTO clicks (affiliate_link_id, link_slug, source_path, retailer, user_agent, country)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO clicks (affiliate_link_id, link_slug, source_path, retailer, user_agent, country,
+           utm_source, utm_medium, utm_campaign, utm_content, utm_term, landing_path, device, deep_link)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(link.id, slug, from, link.retailer, ua, country)
+      .bind(
+        link.id, slug, from, link.retailer, ua, country,
+        attr.utm_source || null, attr.utm_medium || null, attr.utm_campaign || null,
+        attr.utm_content || null, attr.utm_term || null, attr.landing || null,
+        device, useDeepLink ? 1 : 0
+      )
       .run()
       .catch(() => {})
   )
 
-  // 302 so retailers/affiliate networks see the click fresh each time
-  return c.redirect(link.dest_url, 302)
+  // On mobile with a known app, serve a tiny interstitial that opens the native
+  // app and falls back to the web URL — drastically cutting checkout friction.
+  if (useDeepLink) {
+    return c.html(
+      Outbound.buildInterstitial(appLink, web, Outbound.retailerDisplayName(retailer)),
+      200,
+      { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' }
+    )
+  }
+
+  // Desktop / unknown: 302 straight through (retailers see a fresh click).
+  return c.redirect(web, 302)
 })
 
 // ============================================================

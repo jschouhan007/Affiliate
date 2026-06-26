@@ -51,11 +51,68 @@ generic template.
 - **Newsletter signup** (`POST /api/subscribe`) — stores emails in D1.
 - **SEO layer**:
   - JSON-LD: Organization, WebSite, BreadcrumbList, Article/BlogPosting, Product +
-    AggregateRating + **Review (star ratings for SERP)**, FAQPage, ItemList.
+    AggregateRating + **Review (star ratings for SERP)**, FAQPage, ItemList, **ItemPage**.
   - Canonical tags, unique titles/descriptions, Open Graph + Twitter cards per page.
   - Dynamic `sitemap.xml` (auto-includes all deals/posts/categories/**hubs**).
   - `robots.txt` (disallows `/go/`, `/search`, `/api/`, `/compare`).
   - `rss.xml` feed for blog posts.
+
+### Phase 6 — Affiliate-SEO, Performance & Deep Linking (Wave 11)
+A focused pass on the high-impact affiliate-SEO / conversion levers, all edge-native.
+- **SSR for crawlers** — every product, review, hub and article page is fully
+  server-rendered by Hono (no client-side hydration needed for content), so Googlebot
+  and AI crawlers get complete HTML on first byte. (No Next.js required — Hono SSR
+  already satisfies this.)
+- **Mobile deep linking** (`src/lib/outbound.ts` + rewritten `/go/:slug`) — the
+  redirector detects the visitor's device from the User-Agent and, for **mobile users
+  with a known retailer app**, serves a tiny `noindex` interstitial that opens the
+  **native shopping app** to cut checkout friction, then auto-falls-back to the mobile
+  web URL if the app isn't installed:
+  - **Android** → `intent://…#Intent;scheme=https;package=<pkg>;S.browser_fallback_url=…;end`
+    (the OS itself falls back to the browser). Packages: Amazon
+    `com.amazon.mShop.android.shopping`, Flipkart `com.flipkart.android`, Myntra
+    `com.myntra.android`.
+  - **iOS** → retailer custom schemes (`com.amazon.mobile.shopping.web://`, `flipkart://`)
+    tried first, with a JS timer falling back to the web URL.
+  - **Desktop / unknown** → straight 302 to the tagged URL (unchanged behaviour).
+- **Robust first-party tracking** (no third-party cookies):
+  - `public/static/app.js` captures **UTM params on first touch** (`utm_source/medium/
+    campaign/content/term` + landing path) into a first-party `ds_attr` cookie
+    (`SameSite=Lax`, 30 days) **and** `localStorage`; first-touch wins.
+  - UTM params are **preserved across internal navigation** via a capture-phase click
+    listener that re-appends them to internal `<a>` hrefs (external / `#` / `/go/` /
+    `mailto:` links are skipped).
+  - On the outbound hop, `/go/:slug` **reads the `ds_attr` cookie server-side** and
+    **appends the UTMs to the destination URL** (preserving the affiliate `tag=`), so
+    attribution survives the jump to the retailer.
+  - Each click is logged to D1 with **utm_source/medium/campaign/content/term,
+    landing_path, device, and a deep_link flag** (migration `0009`), answering
+    *"which article/campaign drove this affiliate click?"* from first-party data alone.
+- **Strategic `rel` attributes** — **every** outbound affiliate link uses
+  `rel="nofollow sponsored noopener"` (Google's required disclosure for paid/affiliate
+  links); **internal links never carry `nofollow`** (only utility pages like `/search`,
+  `/compare`, `/admin` are `noindex`), preserving internal link equity.
+- **Dynamic canonicalization** — `page()` emits a **self-referencing
+  `<link rel="canonical">` on every page pointing at the CLEAN URL** (query string like
+  `?sort=`, `?utm_*`, and `#` fragments stripped, trailing slash normalised), preventing
+  duplicate-content dilution from sort/tracking params.
+- **Nested Schema markup (JSON-LD)** — review/money pages emit
+  **Product + AggregateOffer + AggregateRating + Review**; articles emit
+  **BlogPosting/Article + ImageObject + BreadcrumbList**; the comparison page emits a
+  new **ItemPage → ItemList → Product[]** graph (`itemPageSchema`).
+- **Edge caching + stale-while-revalidate** — a middleware sets
+  `Cache-Control: public, max-age=0, s-maxage=300, stale-while-revalidate=86400` on
+  public GET HTML so Cloudflare's edge serves cached HTML with near-zero TTFB (great for
+  crawl budget) while revalidating in the background; `/admin`, `/go/`, `/api/` are
+  `no-store`; static assets get a long-lived immutable cache.
+- **Image optimization** — all product `<img>` tags carry native
+  **`loading="lazy"` + `decoding="async"`** (below-the-fold) or **`loading="eager"` +
+  `fetchpriority="high"`** (LCP/hero images), with explicit **`width`/`height`** to
+  eliminate CLS. *Note: Cloudflare Pages has no free runtime image-resize pipeline, so
+  automatic WebP/AVIF transcoding/responsive resizing is not done at the edge here — it
+  would require Cloudflare Images (paid) or pre-processing uploads. The lazy/eager +
+  decoding + dimension hardening is implemented; format conversion is documented as a
+  paid-tier upgrade path.*
 
 ### Phase 5 — Engagement, SEO & Performance
 - **Dynamic Hub-and-Spoke** (`/best`, `/best/:slug`) — programmatic "best-of" collections that
@@ -134,6 +191,10 @@ generic template.
 - **Autoplays** automatically (**3s/slide**), with **small, tightly-aligned bubbly dots** that
   never overlap product content, prev/next arrows, swipe, keyboard arrows, and pause-on-hover/
   focus/tab-hidden. Respects `prefers-reduced-motion`.
+- **Entrance transition animation** — each slide animates in with a tasteful staggered
+  fade + rise (media, then body, then CTA) via `is-active`/`is-entering` classes and CSS
+  keyframes (`heroMediaIn`, `heroBodyIn`, `heroRiseIn`); subtle, not flashy, and fully
+  disabled under `prefers-reduced-motion`.
 - **Mobile-adaptive**: on phones each slide collapses to just the **product image + a compact
   Buy button** beneath it (links straight to the retailer via `/go/:slug`), like Flipkart/Amazon.
 - **Admin-managed**: pick & order which up-to-8 products appear from **`/admin/carousel`**
@@ -157,6 +218,19 @@ products (with prices & buy links), and the hero carousel.**
   each Buy link is stored as a tracked affiliate link routed via `/go/:slug`. One-click
   publish/feature toggles. Deleting a product cleanly cascades its offers + affiliate links.
 - **Carousel** (`/admin/carousel`): the product picker described above.
+- **Categories** (`/admin/categories`): a full **category-tree manager**. View the whole
+  hierarchy as an indented tree table with **per-category usage counts** (deals / posts /
+  child categories); **create** top-level or nested categories (parent picker + auto-slug),
+  **inline edit** name/slug/parent/sort, and **delete** (deleting re-points its deals &
+  posts to "uncategorised" and promotes its children to top-level so nothing is orphaned).
+  Both the post editor and product editor now use a **hierarchical, indented category
+  `<select>`** (parents bold, children indented) instead of a flat list, and the product
+  editor's affiliate-URL field is relabelled "(direct product page URL)" for clarity.
+- **Mega-menu** (header) — the category dropdown is rebuilt into a **clean, aligned
+  layout**: parent categories become titled sections, each with a tidy column grid of
+  their sub-categories, and stand-alone leaf categories sit in a separate leaf grid — no
+  more cramped overlapping columns. A top-level **Footwear** category (with men/women/
+  sports sub-categories and sneaker/formal/sandal/heel/flat leaf types) was added.
 - **Images everywhere**: blog/product Markdown now embeds **bare image URLs on their own line**,
   pasted **raw `<img>` tags**, and `![alt](url)` syntax. All `<img>` use
   `referrerpolicy="no-referrer"` + an `onerror` fallback so hotlink-protected blog/CDN images
@@ -195,6 +269,10 @@ products (with prices & buy links), and the hero carousel.**
 | `/admin/products/toggle/:id` | POST | Publish / unpublish a product |
 | `/admin/products/feature/:id` | POST | Toggle featured |
 | `/admin/carousel` | GET/POST | **Pick & order the 8 hero-carousel products** |
+| `/admin/categories` | GET | **Category-tree manager** (list/usage counts) |
+| `/admin/categories/new` | POST | Create a category (top-level or nested) |
+| `/admin/categories/edit/:id` | POST | Edit a category (name/slug/parent/sort) |
+| `/admin/categories/delete/:id` | POST | Delete (re-points deals/posts, promotes children) |
 | `/admin/logout` | POST | Sign out |
 | `/reviews/:slug` | GET | Single product review / money page |
 | `/blog` | GET | Blog index |
@@ -209,7 +287,8 @@ products (with prices & buy links), and the hero carousel.**
 ## Data Architecture
 - **Storage**: Cloudflare D1 (SQLite) — see `migrations/0001_initial_schema.sql`.
 - **Data models**:
-  - `categories` — top-level categories.
+  - `categories` — hierarchical categories (self-referential `parent_id` for a tree;
+    managed via `/admin/categories`).
   - `affiliate_links` — single source of truth for outbound URLs (swap a link site-wide
     in one place). Referenced via `/go/:slug`.
   - `deals` — products (the money items): title, brand, image, rating, pros/cons, markdown review.
@@ -217,7 +296,8 @@ products (with prices & buy links), and the hero carousel.**
   - `posts` — blog posts + pillar guides (markdown body).
   - `post_deals` — M:N link so a "best of" post lists multiple deals.
   - `faqs` — Q&A attached to a post or deal (powers FAQPage schema).
-  - `clicks` — first-party affiliate click analytics.
+  - `clicks` — first-party affiliate click analytics, now incl. UTM source/medium/
+    campaign/content/term, landing_path, device and a deep_link flag (migration `0009`).
   - `subscribers` — newsletter emails.
 - **Data flow**: blog/pillar posts build topical authority and internal-link into deal/review
   pages; deal pages convert via `/go/:slug` cloaked links; clicks logged to D1 tie revenue
@@ -256,7 +336,9 @@ npm run db:reset
 - **Before deploying**:
   1. Create the production D1 DB: `npx wrangler d1 create dealspot-production` and paste the
      returned `database_id` into `wrangler.jsonc`.
-  2. Apply migrations to prod: `npm run db:migrate:prod`.
+  2. Apply migrations to prod: `npm run db:migrate:prod` (this applies **all** migrations
+     `0001`–`0009`, including the category hierarchy, the Footwear category `0008`, and the
+     click-attribution columns `0009`).
   3. Seed/insert your real content & real affiliate links.
   4. Update `SITE.url` in `src/types.ts` to your real domain.
   5. Deploy via the Cloudflare deploy flow (`npm run deploy`).
@@ -267,6 +349,10 @@ npm run db:reset
 - Image **uploads** (admin accepts image URLs; no runtime file storage — by design on Pages).
 - Pagination on blog listings (the product catalogues ARE paginated: 20/page desktop, 16/page mobile).
 - Price-history tracking / automated price refresh.
+- **Runtime WebP/AVIF transcoding & responsive `srcset` resizing** — not done at the edge
+  (Cloudflare Pages has no free image-resize pipeline). Native lazy/eager loading,
+  `decoding="async"`, `fetchpriority` and explicit dimensions ARE implemented; automatic
+  format conversion is a paid upgrade path (Cloudflare Images or pre-processed uploads).
 - Analytics dashboards (GA4 / Clarity script slots — add your IDs in `layout.tsx`).
 - Email delivery for the newsletter (emails are stored; no sending integration yet).
 
@@ -285,9 +371,19 @@ npm run db:reset
 - Cloudflare Pages + Workers runtime · Cloudflare D1 (SQLite)
 - Tailwind CSS (CDN) · Font Awesome (CDN)
 
-**Last Updated**: 2026-06-25 (restored + improved left filter rail on all catalogues & search +
-Sort/Filter on search results + smart relevance search with synonym/related-word matching across
-title/brand/category/features/description + content-based recommendation engine + similar-product
-recommendations on search + horizontal swipable "You may also like" strip on product pages ·
-previously: catalogue grid 5×4/2×8 + Flipkart-style Sort By everywhere + clean category pages +
-animated Home nav icon + multi-message marquee + hero cover-fit/zoom + 3s autoplay + smaller dots)
+**Last Updated**: 2026-06-26 — **Wave 11 (affiliate-SEO / performance / deep-linking)**:
+mobile deep linking (native Amazon/Flipkart/Myntra app open with web fallback, Android
+`intent://` + iOS custom schemes via a noindex interstitial) + robust first-party UTM
+tracking (first-touch `ds_attr` cookie + localStorage, preserved across internal nav,
+appended to outbound dest, logged to D1 with device/deep_link via migration `0009`) +
+`rel="nofollow sponsored noopener"` on all affiliate links (no nofollow on internal) +
+dynamic self-referencing canonicalization (strips sort/UTM/hash) + nested JSON-LD
+(Product/AggregateOffer/Review · BlogPosting/ImageObject/Breadcrumb · ItemPage/ItemList) +
+edge caching with stale-while-revalidate + image lazy/eager + fetchpriority + decoding +
+width/height (zero-CLS). · **Wave 9/10**: admin overhaul (hierarchical category selects in
+post & product editors, full `/admin/categories` tree CRUD manager with usage counts) +
+carousel 3s autoplay with staggered entrance animation + cleaned-up aligned mega-menu +
+top-level Footwear category (migration `0008`). · Previously: left filter rail on all
+catalogues & search + Sort/Filter on search + smart relevance search + content-based
+recommendations + swipable "You may also like" strip + catalogue grid 5×4/2×8 + dark/light
+themes.
