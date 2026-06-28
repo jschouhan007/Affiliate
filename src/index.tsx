@@ -426,7 +426,7 @@ app.get('/go/:slug', async (c) => {
   // ---- Mobile deep linking ------------------------------------------------
   const device = Outbound.detectDevice(ua)
   const retailer = Outbound.detectRetailer(destWithAttr, link.retailer)
-  const { app: appLink, web, isAndroidIntent } = Outbound.buildDeepLinks(destWithAttr, retailer, device)
+  const { app: appLink, web, isAndroidIntent, intent } = Outbound.buildDeepLinks(destWithAttr, retailer, device)
   const useDeepLink = Outbound.isMobile(device) && !!appLink
 
   // Log click with attribution (never block the redirect on a logging failure)
@@ -451,7 +451,7 @@ app.get('/go/:slug', async (c) => {
   // app and falls back to the web URL — drastically cutting checkout friction.
   if (useDeepLink) {
     return c.html(
-      Outbound.buildInterstitial(appLink, web, Outbound.retailerDisplayName(retailer), !!isAndroidIntent),
+      Outbound.buildInterstitial(appLink, web, Outbound.retailerDisplayName(retailer), !!isAndroidIntent, intent),
       200,
       { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' }
     )
