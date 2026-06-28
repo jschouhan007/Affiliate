@@ -426,7 +426,7 @@ app.get('/go/:slug', async (c) => {
   // ---- Mobile deep linking ------------------------------------------------
   const device = Outbound.detectDevice(ua)
   const retailer = Outbound.detectRetailer(destWithAttr, link.retailer)
-  const { app: appLink, web } = Outbound.buildDeepLinks(destWithAttr, retailer, device)
+  const { app: appLink, web, isAndroidIntent } = Outbound.buildDeepLinks(destWithAttr, retailer, device)
   const useDeepLink = Outbound.isMobile(device) && !!appLink
 
   // Log click with attribution (never block the redirect on a logging failure)
@@ -451,7 +451,7 @@ app.get('/go/:slug', async (c) => {
   // app and falls back to the web URL — drastically cutting checkout friction.
   if (useDeepLink) {
     return c.html(
-      Outbound.buildInterstitial(appLink, web, Outbound.retailerDisplayName(retailer)),
+      Outbound.buildInterstitial(appLink, web, Outbound.retailerDisplayName(retailer), !!isAndroidIntent),
       200,
       { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' }
     )
@@ -496,6 +496,19 @@ app.post('/api/subscribe', async (c) => {
   }
 })
 
+// Website search typeahead (Amazon/Flipkart-style). Public, cached briefly.
+app.get('/api/search-suggest', async (c) => {
+  const q = c.req.query('q') || ''
+  if (!q.trim()) return c.json({ suggestions: [] })
+  try {
+    const suggestions = await Q.getSearchSuggestions(c.env.DB, q, 8)
+    c.header('Cache-Control', 'public, max-age=60, s-maxage=120')
+    return c.json({ suggestions })
+  } catch {
+    return c.json({ suggestions: [] })
+  }
+})
+
 // ============================================================
 // LEGAL / STATIC PAGES
 // ============================================================
@@ -531,6 +544,21 @@ async function requireAdmin(c: any): Promise<boolean> {
   const token = Auth.readCookie(c.req.header('cookie'))
   return await Auth.verifyToken(token, c.env)
 }
+
+// Admin field autocomplete (brand, retailer, author, award, …). Auth-gated.
+// Powers the <datalist> dropdowns so editors reuse existing values.
+app.get('/admin/api/suggest', async (c) => {
+  if (!(await requireAdmin(c))) return c.json({ suggestions: [] }, 401)
+  const field = c.req.query('field') || ''
+  const q = c.req.query('q') || ''
+  try {
+    const suggestions = await Q.getFieldSuggestions(c.env.DB, field, q, 10)
+    c.header('Cache-Control', 'no-store')
+    return c.json({ suggestions })
+  } catch {
+    return c.json({ suggestions: [] })
+  }
+})
 
 // Login screen
 app.get('/admin/login', async (c) => {
@@ -705,6 +733,7 @@ function parseDealBody(body: Record<string, any>): Q.DealInput {
     rating_count: Number.isFinite(rc) ? rc : 0,
     pros: first(body.pros).trim(),
     cons: first(body.cons).trim(),
+    spec_summary: first(body.spec_summary).trim(),
     featured: body.featured ? 1 : 0,
     published: body.published ? 1 : 0,
   }

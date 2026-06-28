@@ -245,10 +245,11 @@ function Header(categories: Category[]): string {
           <a href="/guides" class="nav-link">Buying Guides</a>
         </nav>
         <div class="flex items-center gap-2.5 shrink-0">
-          <form action="/search" method="get" class="search-bar hidden sm:flex items-center" role="search">
+          <form action="/search" method="get" class="search-bar hidden sm:flex items-center" role="search" data-search-suggest>
             <i class="fas fa-search search-icon"></i>
-            <input type="text" name="q" placeholder="Search reviews…" aria-label="Search" class="search-input" />
+            <input type="text" name="q" placeholder="Search reviews…" aria-label="Search" class="search-input" autocomplete="off" />
             <button type="submit" class="search-submit" aria-label="Submit search"><i class="fas fa-arrow-right"></i></button>
+            <div class="search-suggest" role="listbox" aria-label="Search suggestions"></div>
           </form>
           ${ThemeToggle()}
           <button id="mobile-menu-btn" class="mobile-burger md:hidden" aria-label="Menu" aria-expanded="false">
@@ -267,10 +268,11 @@ function Header(categories: Category[]): string {
           <summary class="mobile-link flex items-center justify-between cursor-pointer">Categories <i class="fas fa-chevron-down text-[0.7rem] transition-transform"></i></summary>
           <div class="pt-1 pl-1">${mobileCatLinks}</div>
         </details>
-        <form action="/search" method="get" class="search-bar search-bar--mobile flex items-center mt-3" role="search">
+        <form action="/search" method="get" class="search-bar search-bar--mobile flex items-center mt-3" role="search" data-search-suggest>
           <i class="fas fa-search search-icon"></i>
-          <input type="text" name="q" placeholder="Search reviews…" aria-label="Search" class="search-input flex-1" />
+          <input type="text" name="q" placeholder="Search reviews…" aria-label="Search" class="search-input flex-1" autocomplete="off" />
           <button type="submit" class="search-submit" aria-label="Submit search"><i class="fas fa-arrow-right"></i></button>
+          <div class="search-suggest" role="listbox" aria-label="Search suggestions"></div>
         </form>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { SITE, type Category, type Deal, type Post, type Hub } from '../types'
 import { renderMarkdown } from '../lib/markdown'
+import { parseSpecs, looksLikeSpecSheet, renderSpecTable } from '../lib/specs'
 import { formatPrice, discountPct, formatDate, timeAgo } from '../lib/format'
 import {
   Breadcrumbs,
@@ -329,6 +330,27 @@ export function ReviewPage(data: {
   const cheapest = (deal.offers || []).filter((o) => o.price != null).sort((a, b) => (a.price as number) - (b.price as number))[0]
   const disc = cheapest ? discountPct(cheapest.price, cheapest.original_price) : null
 
+  // ---- Specifications -----------------------------------------------------
+  // The `description` field sometimes holds a retailer-pasted spec sheet
+  // ("Material compositionPOLYY COTTON\nPatternSolid…") rather than a prose
+  // review. Detect that and render a clean spec TABLE instead of dropcap prose
+  // (which produced the garbled run-together text + giant drop-cap). Any
+  // dedicated spec fields are also parsed into the table.
+  const descIsSpecSheet = looksLikeSpecSheet(deal.description)
+  const explicitSpecs = parseSpecs(deal.spec_summary)
+  const descSpecs = descIsSpecSheet ? parseSpecs(deal.description) : []
+  // Merge, keeping the first value for any duplicated label.
+  const specMap = new Map<string, string>()
+  for (const s of [...explicitSpecs, ...descSpecs]) {
+    if (!specMap.has(s.label.toLowerCase())) specMap.set(s.label.toLowerCase(), s.value)
+  }
+  const allSpecs = [...specMap.entries()].map(([k, value], idx) => {
+    // Recover a nicely-cased label from whichever source produced it.
+    const orig = [...explicitSpecs, ...descSpecs].find((s) => s.label.toLowerCase() === k)
+    return { label: orig ? orig.label : k, value }
+  })
+  const hasProseReview = !!deal.description && !descIsSpecSheet
+
   return `<div class="max-w-editorial mx-auto px-5 py-12">
     ${Breadcrumbs([
       { name: 'Home', url: '/' },
@@ -366,10 +388,15 @@ export function ReviewPage(data: {
       ${ProsCons(deal)}
     </section>` : ''}
 
-    ${deal.description ? `<section class="mt-16">
+    ${hasProseReview ? `<section class="mt-16">
       <div class="eyebrow mb-3">Full review</div>
       <h2 class="font-serif text-3xl text-ink mb-8">Our take</h2>
-      <div class="prose-area dropcap">${renderMarkdown(deal.description)}</div>
+      <div class="prose-area dropcap">${renderMarkdown(deal.description as string)}</div>
+    </section>` : ''}
+
+    ${allSpecs.length ? `<section class="mt-16 max-w-3xl">
+      <div class="eyebrow mb-3 flex items-center gap-3"><span class="kicker-rule"></span>The details</div>
+      ${renderSpecTable(allSpecs, { title: 'Specifications' })}
     </section>` : ''}
 
     ${FaqSection(faqs)}

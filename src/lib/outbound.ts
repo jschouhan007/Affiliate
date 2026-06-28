@@ -98,45 +98,66 @@ export function detectRetailer(destUrl: string, hint?: string): Retailer {
   return 'other'
 }
 
+// Known retailer Android package names + iOS custom URL schemes.
+const RETAILER_ANDROID_PKG: Record<Retailer, string | undefined> = {
+  amazon: 'com.amazon.mShop.android.shopping',
+  flipkart: 'com.flipkart.android',
+  myntra: 'com.myntra.android',
+  ajio: 'com.ril.ajio',
+  other: undefined,
+}
+
+// iOS custom URL schemes. These dead-end (show "address invalid") if the app
+// isn't installed, so on iOS we ALWAYS run a JS timer fallback to the web URL.
+const RETAILER_IOS_SCHEME: Record<Retailer, string | undefined> = {
+  // Amazon's app handles its https universal links AND a custom scheme. The
+  // custom scheme form that reliably opens a product is the shopping web scheme
+  // pointing at the full https URL (host included).
+  amazon: 'com.amazon.mobile.shopping.web://',
+  flipkart: 'flipkart://',
+  myntra: 'myntra://',
+  ajio: undefined,
+  other: undefined,
+}
+
 // ---- Deep-link builders ------------------------------------------------------
-// Returns { app, web } where `app` is the native-app deep link (may be a custom
-// scheme or an android intent:// URL) and `web` is the safe https fallback.
-export function buildDeepLinks(destUrl: string, retailer: Retailer, device: Device): { app?: string; web: string } {
+// Returns { app, web } where `app` is the native-app deep link (an android
+// intent:// URL OR an iOS custom scheme) and `web` is the safe https fallback.
+//
+// IMPORTANT design note (the bug we are fixing):
+//   * On ANDROID we hand back an intent:// URL. Android/Chrome handles the
+//     "open app, else go to browser_fallback_url" logic NATIVELY. The
+//     interstitial therefore must NOT run a JS timer that races the OS — doing
+//     so was forcing the web version even when the app was opening. We flag
+//     android links so the interstitial knows to skip the JS fallback.
+//   * On iOS, custom schemes dead-end silently when the app is missing, so the
+//     interstitial DOES need a JS timer fallback to the web URL.
+export function buildDeepLinks(
+  destUrl: string,
+  retailer: Retailer,
+  device: Device
+): { app?: string; web: string; isAndroidIntent?: boolean } {
   const web = destUrl
   if (device === 'desktop') return { web }
 
-  if (retailer === 'amazon') {
-    if (device === 'android') {
-      // intent:// auto-falls-back to the browser if the app is missing.
-      return { app: toAndroidIntent(destUrl, 'com.amazon.mShop.android.shopping'), web }
-    }
-    // iOS: Amazon registers the http(s) universal link + a custom scheme.
-    // Universal links open the app automatically when installed; we still try
-    // the scheme as a nudge. Use the web URL with the app's known scheme host.
-    return { app: destUrl.replace(/^https?:\/\//, 'com.amazon.mobile.shopping.web://'), web }
+  if (device === 'android') {
+    const pkg = RETAILER_ANDROID_PKG[retailer]
+    if (!pkg) return { web }
+    return { app: toAndroidIntent(destUrl, pkg), web, isAndroidIntent: true }
   }
 
-  if (retailer === 'flipkart') {
-    if (device === 'android') {
-      return { app: toAndroidIntent(destUrl, 'com.flipkart.android'), web }
-    }
-    return { app: destUrl.replace(/^https?:\/\//, 'flipkart://'), web }
-  }
-
-  if (retailer === 'myntra') {
-    if (device === 'android') return { app: toAndroidIntent(destUrl, 'com.myntra.android'), web }
-    return { app: destUrl.replace(/^https?:\/\//, 'myntra://'), web }
-  }
-
-  // ajio / other: no reliable public scheme — universal links (if any) still
-  // open the app via the plain https URL, so just hand over the web URL.
-  return { web }
+  // iOS
+  const scheme = RETAILER_IOS_SCHEME[retailer]
+  if (!scheme) return { web }
+  return { app: destUrl.replace(/^https?:\/\//, scheme), web, isAndroidIntent: false }
 }
 
 // Build an Android intent:// URL with a browser fallback baked in. If the app
 // isn't installed, Chrome follows S.browser_fallback_url back to the web URL.
+// We strip the https:// scheme from the host portion and declare scheme=https
+// inside the intent so Android matches the retailer's verified App Link filter.
 function toAndroidIntent(httpsUrl: string, pkg: string): string {
-  let rest = httpsUrl.replace(/^https?:\/\//, '')
+  const rest = httpsUrl.replace(/^https?:\/\//, '')
   const fallback = encodeURIComponent(httpsUrl)
   return `intent://${rest}#Intent;scheme=https;package=${pkg};S.browser_fallback_url=${fallback};end`
 }
@@ -145,13 +166,68 @@ function toAndroidIntent(httpsUrl: string, pkg: string): string {
 // A minimal, instant HTML page that attempts the app deep link then falls back
 // to the web URL. Kept tiny (inline, no external assets) so TTFB stays low and
 // the handoff feels instant. noindex so it never gets crawled/indexed.
-export function buildInterstitial(app: string | undefined, web: string, retailerName: string): string {
-  const safeWeb = web.replace(/"/g, '&quot;')
-  const safeApp = (app || '').replace(/"/g, '&quot;')
+//
+// Two distinct strategies (this is the core of the deep-link fix):
+//   * ANDROID intent:// — navigate to the intent and DO NOTHING else. Android
+//     itself opens the app if installed, or follows S.browser_fallback_url to
+//     the web URL if not. Any JS timer would race the OS and wrongly force the
+//     web version while the app is still launching, which is exactly the bug
+//     the user reported. So for Android we run NO fallback timer at all.
+//   * iOS custom scheme — the scheme dead-ends silently if the app is missing,
+//     so we DO need a JS timer: try the scheme, and if we're still visible after
+//     a grace period (app didn't take over), go to the web URL.
+export function buildInterstitial(
+  app: string | undefined,
+  web: string,
+  retailerName: string,
+  isAndroidIntent: boolean = false
+): string {
+  const safeWeb = web.replace(/"/g, '&quot;').replace(/</g, '&lt;')
+  const safeApp = (app || '').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+  const display = retailerName.replace(/</g, '&lt;')
+
+  // Build the device-appropriate handoff script.
+  let handoff: string
+  if (!app) {
+    handoff = `window.location.replace(${JSON.stringify(web)});`
+  } else if (isAndroidIntent) {
+    // Android: hand the intent:// straight to the OS. No JS fallback timer —
+    // the intent's S.browser_fallback_url is the fallback. We use a top-level
+    // navigation (location.href) which Chrome/WebView route to the app.
+    handoff = `
+      try { window.location.href = ${JSON.stringify(app)}; }
+      catch (e) { window.location.replace(${JSON.stringify(web)}); }`
+  } else {
+    // iOS: try the custom scheme, fall back to web if the app didn't open.
+    // We watch for the page being hidden (app took over) to cancel the fallback.
+    handoff = `
+      var web = ${JSON.stringify(web)};
+      var app = ${JSON.stringify(app)};
+      var done = false;
+      var start = Date.now();
+      function goWeb(){
+        if (done) return;
+        // If a lot of wall-clock time elapsed, the app likely opened (JS was
+        // suspended) — don't yank the user back to the browser.
+        if (Date.now() - start > 2200) return;
+        done = true;
+        window.location.replace(web);
+      }
+      var hidden = false;
+      document.addEventListener('visibilitychange', function(){
+        if (document.hidden) { hidden = true; done = true; }
+      });
+      window.addEventListener('pagehide', function(){ done = true; });
+      // Attempt the app scheme.
+      try { window.location.href = app; } catch (e) { window.location.replace(web); }
+      // If still here after the grace period and not hidden, go to web.
+      setTimeout(function(){ if (!hidden) goWeb(); }, 1500);`
+  }
+
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta name="robots" content="noindex,nofollow" />
-<title>Opening ${retailerName}…</title>
+<title>Opening ${display}…</title>
 <style>
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#14100E;color:#EDE3D2;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center}
   .box{padding:2rem}
@@ -162,28 +238,11 @@ export function buildInterstitial(app: string | undefined, web: string, retailer
 <body>
   <div class="box">
     <div class="spin"></div>
-    <p>Opening ${retailerName}…</p>
+    <p>Opening ${display}…</p>
     <p style="font-size:.85rem;opacity:.7">Not redirected? <a id="fb" href="${safeWeb}">Tap here to continue</a></p>
   </div>
   <script>
-  (function(){
-    var app=${app ? `"${safeApp}"` : 'null'};
-    var web="${safeWeb}";
-    var done=false;
-    function goWeb(){ if(done) return; done=true; window.location.replace(web); }
-    // Try the app deep link first.
-    if(app){
-      // If the app opens, the page is backgrounded and our fallback timer is
-      // throttled/cancelled. If it doesn't, we bounce to web quickly.
-      var t=setTimeout(goWeb, 1200);
-      document.addEventListener('visibilitychange', function(){ if(document.hidden){ clearTimeout(t); } });
-      try { window.location.href = app; } catch(e){ goWeb(); }
-    } else {
-      goWeb();
-    }
-    // Hard safety net.
-    setTimeout(goWeb, 2500);
-  })();
+  (function(){${handoff}})();
   </script>
 </body></html>`
 }

@@ -560,6 +560,7 @@ export interface DealInput {
   rating_count?: number
   pros?: string
   cons?: string
+  spec_summary?: string
   featured?: number
   published?: number
 }
@@ -591,8 +592,8 @@ export async function createDeal(db: D1Database, d: DealInput): Promise<number> 
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
   const res = await db
     .prepare(
-      `INSERT INTO deals (slug, title, category_id, brand, image_url, short_desc, description, rating, rating_count, pros, cons, featured, published, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO deals (slug, title, category_id, brand, image_url, short_desc, description, rating, rating_count, pros, cons, spec_summary, featured, published, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     )
     .bind(
       d.slug,
@@ -606,6 +607,7 @@ export async function createDeal(db: D1Database, d: DealInput): Promise<number> 
       d.rating_count ?? 0,
       d.pros || null,
       d.cons || null,
+      d.spec_summary || null,
       d.featured ? 1 : 0,
       d.published ? 1 : 0,
       now,
@@ -619,7 +621,7 @@ export async function updateDeal(db: D1Database, id: number, d: DealInput): Prom
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
   await db
     .prepare(
-      `UPDATE deals SET slug=?, title=?, category_id=?, brand=?, image_url=?, short_desc=?, description=?, rating=?, rating_count=?, pros=?, cons=?, featured=?, published=?, updated_at=?
+      `UPDATE deals SET slug=?, title=?, category_id=?, brand=?, image_url=?, short_desc=?, description=?, rating=?, rating_count=?, pros=?, cons=?, spec_summary=?, featured=?, published=?, updated_at=?
        WHERE id=?`
     )
     .bind(
@@ -634,6 +636,7 @@ export async function updateDeal(db: D1Database, id: number, d: DealInput): Prom
       d.rating_count ?? 0,
       d.pros || null,
       d.cons || null,
+      d.spec_summary || null,
       d.featured ? 1 : 0,
       d.published ? 1 : 0,
       now,
@@ -984,4 +987,155 @@ export async function getRecommendationsForDeals(
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map((x) => x.d)
+}
+
+// ============================================================
+// AUTOCOMPLETE / SUGGESTIONS
+// ============================================================
+
+// Admin autocomplete: distinct existing values for a given field, filtered by a
+// typed prefix/substring. Powers the <datalist> dropdowns in the admin editors
+// (brand, retailer, author, award, tested_by, etc.) so editors reuse existing
+// values (e.g. typing "b" surfaces "boAt") instead of creating inconsistent
+// duplicates. We whitelist the column/table to keep this injection-safe.
+const SUGGEST_SOURCES: Record<string, { table: string; column: string }> = {
+  brand: { table: 'deals', column: 'brand' },
+  award: { table: 'deals', column: 'award' },
+  tested_by: { table: 'deals', column: 'tested_by' },
+  retailer: { table: 'affiliate_links', column: 'retailer' },
+  author: { table: 'posts', column: 'author' },
+  author_role: { table: 'posts', column: 'author_role' },
+}
+
+export async function getFieldSuggestions(
+  db: D1Database,
+  field: string,
+  q: string,
+  limit = 8
+): Promise<string[]> {
+  const src = SUGGEST_SOURCES[field]
+  if (!src) return []
+  const term = (q || '').trim().toLowerCase()
+  const col = src.column
+  // Distinct, non-empty values; rank prefix matches above substring matches.
+  let sql = `SELECT DISTINCT ${col} AS v FROM ${src.table} WHERE ${col} IS NOT NULL AND TRIM(${col}) <> ''`
+  const binds: unknown[] = []
+  if (term) {
+    sql += ` AND LOWER(${col}) LIKE ?`
+    binds.push(`%${term}%`)
+  }
+  sql += ` ORDER BY ${col} COLLATE NOCASE LIMIT 60`
+  const { results } = await db.prepare(sql).bind(...binds).all<{ v: string }>()
+  let vals = (results || []).map((r) => r.v).filter(Boolean)
+  if (term) {
+    // Prefix matches first, then the rest, both alphabetical.
+    vals = vals.sort((a, b) => {
+      const ap = a.toLowerCase().startsWith(term) ? 0 : 1
+      const bp = b.toLowerCase().startsWith(term) ? 0 : 1
+      if (ap !== bp) return ap - bp
+      return a.localeCompare(b)
+    })
+  }
+  // De-dupe case-insensitively, preserving first (best-ranked) casing.
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const v of vals) {
+    const k = v.toLowerCase()
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(v)
+    if (out.length >= limit) break
+  }
+  return out
+}
+
+// Common spec labels for the spec-sheet field datalist (static, but handy).
+export const COMMON_SPEC_LABELS = [
+  'Material composition', 'Pattern', 'Fit type', 'Sleeve type', 'Collar style',
+  'Length', 'Country of Origin', 'Care Instructions', 'Closure Type', 'Occasion',
+  'Capacity', 'Wattage', 'Warranty', 'Connectivity', 'Battery', 'Display',
+  'Processor', 'RAM', 'Storage', 'Screen Size', 'Resolution', 'Special Feature',
+]
+
+// Website search suggestions (Amazon/Flipkart-style typeahead). Returns a small
+// ranked list of suggestion strings: matching product titles + brands +
+// category names. Designed to be fast (single LIKE query, capped) and typed.
+export interface SearchSuggestion {
+  text: string
+  type: 'product' | 'brand' | 'category'
+  slug?: string
+  image?: string
+}
+
+export async function getSearchSuggestions(
+  db: D1Database,
+  q: string,
+  limit = 8
+): Promise<SearchSuggestion[]> {
+  const term = (q || '').trim().toLowerCase()
+  if (term.length < 1) return []
+  const like = `%${term}%`
+  const prefixLike = `${term}%`
+
+  // Matching products (title) — these are the most useful, show with image.
+  const { results: prods } = await db
+    .prepare(
+      `SELECT d.title AS title, d.slug AS slug, d.image_url AS image, d.brand AS brand
+       FROM deals d
+       WHERE d.published = 1 AND (LOWER(d.title) LIKE ? OR LOWER(d.brand) LIKE ?)
+       ORDER BY (CASE WHEN LOWER(d.title) LIKE ? THEN 0 ELSE 1 END),
+                d.featured DESC, d.rating DESC
+       LIMIT 30`
+    )
+    .bind(like, like, prefixLike)
+    .all<{ title: string; slug: string; image?: string; brand?: string }>()
+
+  // Matching categories.
+  const { results: cats } = await db
+    .prepare(
+      `SELECT name, slug FROM categories WHERE LOWER(name) LIKE ? ORDER BY name LIMIT 5`
+    )
+    .bind(like)
+    .all<{ name: string; slug: string }>()
+
+  const out: SearchSuggestion[] = []
+  const seen = new Set<string>()
+
+  // Distinct brand suggestions (from matching products) first if the term looks
+  // like a brand prefix.
+  const brandSet = new Set<string>()
+  for (const p of prods || []) {
+    if (p.brand && p.brand.toLowerCase().includes(term)) {
+      const k = 'b:' + p.brand.toLowerCase()
+      if (!brandSet.has(p.brand.toLowerCase())) {
+        brandSet.add(p.brand.toLowerCase())
+        if (!seen.has(k)) {
+          seen.add(k)
+          out.push({ text: p.brand, type: 'brand' })
+        }
+      }
+    }
+  }
+
+  // Category suggestions.
+  for (const c of cats || []) {
+    const k = 'c:' + c.name.toLowerCase()
+    if (!seen.has(k)) {
+      seen.add(k)
+      out.push({ text: c.name, type: 'category', slug: c.slug })
+    }
+  }
+
+  // Product suggestions.
+  for (const p of prods || []) {
+    const k = 'p:' + p.slug
+    if (!seen.has(k)) {
+      seen.add(k)
+      out.push({ text: p.title, type: 'product', slug: p.slug, image: p.image })
+    }
+    if (out.length >= limit + 4) break
+  }
+
+  // Interleave: keep a few brands/categories at top, products fill the rest.
+  return out.slice(0, limit)
 }

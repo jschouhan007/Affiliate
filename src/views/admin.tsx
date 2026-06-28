@@ -28,12 +28,73 @@ function shell(title: string, body: string, opts: { flash?: string; error?: stri
     .ad-danger { color:#F87171; border:1px solid #4a2222; }
     .ad-danger:hover { background:#3a1a1a; }
     .card { background:#151B2B; border:1px solid #28324A; border-radius:1rem; }
+    /* Autocomplete dropdown for [data-suggest] inputs */
+    .ac-wrap { position:relative; }
+    .ac-menu { position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:50;
+      background:#101624; border:1px solid #2C3650; border-radius:.6rem; box-shadow:0 12px 30px rgba(0,0,0,.45);
+      max-height:260px; overflow-y:auto; display:none; }
+    .ac-menu.open { display:block; }
+    .ac-item { padding:.55rem .9rem; cursor:pointer; font-size:.9rem; color:#DCE3F0; display:flex; align-items:center; gap:.6rem; }
+    .ac-item:hover, .ac-item.active { background:#1C2540; color:#fff; }
+    .ac-item .ac-tag { margin-left:auto; font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; color:#7A87A0; }
+    .ac-empty { padding:.55rem .9rem; font-size:.82rem; color:#7A87A0; }
   </style>
 </head>
 <body class="min-h-screen">
   ${raw(opts.flash ? `<div class="bg-emerald-900/40 border-b border-emerald-700/40 text-emerald-200 text-sm px-5 py-3 text-center">${escapeHtml(opts.flash)}</div>` : '')}
   ${raw(opts.error ? `<div class="bg-red-900/40 border-b border-red-700/40 text-red-200 text-sm px-5 py-3 text-center">${escapeHtml(opts.error)}</div>` : '')}
   ${raw(body)}
+  <script>
+  // ---- Admin autocomplete (history-based suggestions) --------------------
+  // Any <input data-suggest="brand"> gets a live dropdown of existing values
+  // from the DB (e.g. type "b" -> "boAt"). Debounced, keyboard-navigable.
+  (function(){
+    function attach(input){
+      var field = input.getAttribute('data-suggest');
+      if(!field || input._ac) return; input._ac = true;
+      // Wrap the input so the menu can be absolutely positioned.
+      var wrap = document.createElement('div'); wrap.className='ac-wrap';
+      input.parentNode.insertBefore(wrap, input); wrap.appendChild(input);
+      var menu = document.createElement('div'); menu.className='ac-menu'; wrap.appendChild(menu);
+      var items=[], active=-1, t=null, lastQ=null;
+      function close(){ menu.classList.remove('open'); active=-1; }
+      function render(list){
+        items=list||[];
+        if(!items.length){ menu.innerHTML='<div class="ac-empty">No matches yet</div>'; menu.classList.add('open'); return; }
+        menu.innerHTML = items.map(function(v,i){
+          return '<div class="ac-item" data-i="'+i+'">'+esc(v)+'</div>';
+        }).join('');
+        menu.classList.add('open'); active=-1;
+        [].forEach.call(menu.querySelectorAll('.ac-item'), function(el){
+          el.addEventListener('mousedown', function(e){ e.preventDefault(); pick(parseInt(el.getAttribute('data-i'),10)); });
+        });
+      }
+      function pick(i){ if(i<0||i>=items.length) return; input.value=items[i]; close(); input.dispatchEvent(new Event('input',{bubbles:true})); }
+      function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+      function fetchSuggest(){
+        var q=input.value.trim();
+        if(q===lastQ) return; lastQ=q;
+        fetch('/admin/api/suggest?field='+encodeURIComponent(field)+'&q='+encodeURIComponent(q))
+          .then(function(r){ return r.json(); })
+          .then(function(d){ render(d.suggestions||[]); })
+          .catch(function(){ close(); });
+      }
+      input.addEventListener('input', function(){ clearTimeout(t); t=setTimeout(fetchSuggest,140); });
+      input.addEventListener('focus', function(){ clearTimeout(t); t=setTimeout(fetchSuggest,80); });
+      input.addEventListener('blur', function(){ setTimeout(close,150); });
+      input.addEventListener('keydown', function(e){
+        if(!menu.classList.contains('open')) return;
+        if(e.key==='ArrowDown'){ e.preventDefault(); active=Math.min(active+1,items.length-1); hi(); }
+        else if(e.key==='ArrowUp'){ e.preventDefault(); active=Math.max(active-1,0); hi(); }
+        else if(e.key==='Enter'){ if(active>=0){ e.preventDefault(); pick(active); } }
+        else if(e.key==='Escape'){ close(); }
+      });
+      function hi(){ [].forEach.call(menu.querySelectorAll('.ac-item'), function(el,i){ el.classList.toggle('active', i===active); }); }
+    }
+    function init(){ [].forEach.call(document.querySelectorAll('input[data-suggest]'), attach); }
+    if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded', init);
+  })();
+  </script>
 </body>
 </html>`
 }
@@ -254,11 +315,11 @@ export function AdminEditor(data: { post?: Post; categories: Category[]; error?:
       <div class="grid sm:grid-cols-2 gap-4">
         <div>
           <label class="ad-label">Author</label>
-          <input name="author" class="ad-input" value="${p ? escapeAttr(p.author || '') : 'DealSpot Editorial'}" />
+          <input name="author" class="ad-input" value="${p ? escapeAttr(p.author || '') : 'DealSpot Editorial'}" data-suggest="author" autocomplete="off" />
         </div>
         <div>
           <label class="ad-label">Author role</label>
-          <input name="author_role" class="ad-input" value="${p ? escapeAttr(p.author_role || '') : 'Editorial'}" />
+          <input name="author_role" class="ad-input" value="${p ? escapeAttr(p.author_role || '') : 'Editorial'}" data-suggest="author_role" autocomplete="off" />
         </div>
       </div>
       <div class="flex items-center gap-6 pt-2">
@@ -614,7 +675,7 @@ export function AdminProductEditor(data: { deal?: Deal; categories: Category[]; 
         </div>
         <div>
           <label class="ad-label">Brand</label>
-          <input name="brand" class="ad-input" value="${d ? escapeAttr(d.brand || '') : ''}" placeholder="boAt" />
+          <input name="brand" class="ad-input" value="${d ? escapeAttr(d.brand || '') : ''}" placeholder="boAt" data-suggest="brand" autocomplete="off" />
         </div>
       </div>
 
@@ -664,6 +725,12 @@ export function AdminProductEditor(data: { deal?: Deal; categories: Category[]; 
           <label class="ad-label">Cons <span class="text-[#7A87A0] normal-case">(one per line)</span></label>
           <textarea name="cons" rows="4" class="ad-input text-sm">${d ? escapeHtml(d.cons || '') : ''}</textarea>
         </div>
+      </div>
+
+      <div>
+        <label class="ad-label">Specifications <span class="text-[#7A87A0] normal-case">(one per line — "Label: Value")</span></label>
+        <textarea name="spec_summary" rows="6" class="ad-input font-mono text-sm leading-relaxed" placeholder="Material composition: Poly Cotton&#10;Pattern: Solid&#10;Fit type: Regular Fit&#10;Sleeve type: Long Sleeve&#10;Country of Origin: India">${d ? escapeHtml(d.spec_summary || '') : ''}</textarea>
+        <p class="text-xs text-[#7A87A0] mt-1.5">Renders as a clean spec table on the product page. Use <code>Label: Value</code> per line. Pasted retailer spec sheets (even run-together text) are auto-tidied.</p>
       </div>
 
       <!-- ============ OFFERS / BUY LINKS ============ -->
