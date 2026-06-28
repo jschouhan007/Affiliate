@@ -481,22 +481,18 @@
     // expose autoplay duration to CSS so the active-dot fill bar matches it
     root.style.setProperty('--hero-autoplay', delay + 'ms');
 
+    function setX(percent) {
+      track.style.transform = 'translateX(' + percent + '%)';
+    }
+
     function go(n, fromUser) {
       index = (n + count) % count;
-      track.style.transform = 'translateX(' + (-index * 100) + '%)';
+      setX(-index * 100);
       for (var i = 0; i < dots.length; i++) {
         dots[i].classList.toggle('is-active', i === index);
       }
-      // Mark the active slide so its inner content can fade/rise in (CSS).
-      // Re-trigger the entrance animation by toggling the class off → on.
       for (var s = 0; s < slides.length; s++) {
         slides[s].classList.toggle('is-active', s === index);
-      }
-      var active = slides[index];
-      if (active && !reduce) {
-        active.classList.remove('is-entering');
-        void active.offsetWidth; // force reflow to restart the animation
-        active.classList.add('is-entering');
       }
       reflowActiveDot();
       if (fromUser) restart();
@@ -539,27 +535,78 @@
       if (document.hidden) stop(); else restart();
     });
 
-    // Touch / swipe support — autoplay keeps running; a swipe just nudges the
-    // index and re-syncs the timer (restart) so the next auto-advance is a full
-    // interval away (feels natural, never stalls).
-    var startX = 0, startY = 0, dx = 0, dy = 0, swiping = false;
+    // ---- Drag / swipe support (Amazon/Flipkart-style) ----
+    // The strip follows the finger 1:1 while dragging, then snaps to the nearest
+    // slide on release with the CSS glide. Works for touch AND mouse-drag.
+    var startX = 0, startY = 0, dx = 0, dy = 0;
+    var dragging = false, decidedAxis = false, horizontal = false;
+    var vpWidth = 1; // viewport width in px (for px → % conversion)
+
+    function dragStart(x, y) {
+      startX = x; startY = y; dx = 0; dy = 0;
+      dragging = true; decidedAxis = false; horizontal = false;
+      vpWidth = track.getBoundingClientRect().width || window.innerWidth || 1;
+      stop(); // pause autoplay while the user is in control
+    }
+    function dragMove(x, y) {
+      if (!dragging) return false;
+      dx = x - startX; dy = y - startY;
+      // Decide gesture axis once movement is meaningful
+      if (!decidedAxis && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+        decidedAxis = true;
+        horizontal = Math.abs(dx) > Math.abs(dy);
+        if (horizontal) track.classList.add('is-dragging');
+      }
+      if (horizontal) {
+        // follow the finger; add light rubber-band resistance at the ends
+        var base = -index * 100;
+        var deltaPct = (dx / vpWidth) * 100;
+        var atStart = index === 0 && dx > 0;
+        var atEnd = index === count - 1 && dx < 0;
+        if (atStart || atEnd) deltaPct *= 0.35;
+        setX(base + deltaPct);
+        return true; // signal caller to preventDefault (block page scroll)
+      }
+      return false;
+    }
+    function dragEnd() {
+      if (!dragging) return; dragging = false;
+      track.classList.remove('is-dragging');
+      if (horizontal) {
+        // commit to a neighbour if dragged far/fast enough, else snap back
+        var threshold = Math.max(40, vpWidth * 0.12);
+        if (dx <= -threshold) go(index + 1);
+        else if (dx >= threshold) go(index - 1);
+        else go(index); // snap back
+      }
+      restart(); // resume autoplay, full interval away
+    }
+
+    // Touch
     track.addEventListener('touchstart', function (e) {
-      startX = e.touches[0].clientX; startY = e.touches[0].clientY;
-      dx = 0; dy = 0; swiping = true;
+      dragStart(e.touches[0].clientX, e.touches[0].clientY);
     }, { passive: true });
     track.addEventListener('touchmove', function (e) {
-      if (!swiping) return;
-      dx = e.touches[0].clientX - startX;
-      dy = e.touches[0].clientY - startY;
-    }, { passive: true });
-    track.addEventListener('touchend', function () {
-      if (!swiping) return; swiping = false;
-      // only treat as horizontal swipe if mostly horizontal
-      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
-        if (dx < 0) nextSlide(); else prevSlide();
-        restart();
-      }
+      var blocked = dragMove(e.touches[0].clientX, e.touches[0].clientY);
+      if (blocked && e.cancelable) e.preventDefault();
+    }, { passive: false });
+    track.addEventListener('touchend', dragEnd);
+    track.addEventListener('touchcancel', dragEnd);
+
+    // Mouse drag (desktop) — only the primary button
+    track.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      dragStart(e.clientX, e.clientY);
     });
+    document.addEventListener('mousemove', function (e) {
+      if (!dragging) return;
+      if (dragMove(e.clientX, e.clientY)) e.preventDefault();
+    });
+    document.addEventListener('mouseup', dragEnd);
+    // Prevent the click that follows a real drag from triggering link nav
+    track.addEventListener('click', function (e) {
+      if (Math.abs(dx) > 8) { e.preventDefault(); e.stopPropagation(); }
+    }, true);
 
     // Keyboard arrows when carousel focused
     root.addEventListener('keydown', function (e) {

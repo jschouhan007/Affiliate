@@ -871,14 +871,23 @@ input[type="checkbox"], input[type="radio"]{ accent-color: var(--accent); width:
 .hero-carousel__viewport {
   overflow: hidden;
   border-radius: 1.75rem;
+  cursor: grab;               /* desktop drag affordance */
 }
+.hero-carousel__viewport:active { cursor: grabbing; }
 .hero-carousel__track {
   display: flex;
   width: 100%;
   will-change: transform;
-  /* Smooth, swift glide between slides (manual + autoplay). */
-  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Smooth, swift horizontal glide between slides (manual + autoplay) — this
+     IS the sliding effect like major e-commerce carousels. The whole strip of
+     slides slides sideways as one solid panel. */
+  transition: transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* allow vertical page scroll but let JS own horizontal swipe gestures */
+  touch-action: pan-y;
 }
+/* While the user is dragging with a finger, kill the transition so the strip
+   tracks the finger 1:1; JS re-enables it on release for the snap-back glide. */
+.hero-carousel__track.is-dragging { transition: none; cursor: grabbing; }
 .hero-slide {
   flex: 0 0 100%;
   min-width: 100%;
@@ -954,41 +963,15 @@ input[type="checkbox"], input[type="radio"]{ accent-color: var(--accent); width:
 }
 .hero-slide:hover .hero-slide__img { transform: scale(1.08); }
 
-/* ---- Slide entrance animation ----
-   When a slide becomes active (.is-entering, toggled by app.js), its image and
-   text block gently fade + rise/scale in. Subtle and quick so it feels polished,
-   not flashy. The media and body are staggered for a refined cascade. */
-.hero-slide__media,
-.hero-slide__body { will-change: transform, opacity; }
-.hero-slide.is-entering .hero-slide__media {
-  animation: heroMediaIn 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.hero-slide.is-entering .hero-slide__body {
-  animation: heroBodyIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-/* stagger the text children for a soft cascade */
-.hero-slide.is-entering .hero-slide__body > * {
-  animation: heroRiseIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.hero-slide.is-entering .hero-slide__body > *:nth-child(1) { animation-delay: 0.05s; }
-.hero-slide.is-entering .hero-slide__body > *:nth-child(2) { animation-delay: 0.10s; }
-.hero-slide.is-entering .hero-slide__body > *:nth-child(3) { animation-delay: 0.15s; }
-.hero-slide.is-entering .hero-slide__body > *:nth-child(4) { animation-delay: 0.20s; }
-.hero-slide.is-entering .hero-slide__body > *:nth-child(5) { animation-delay: 0.25s; }
-.hero-slide.is-entering .hero-slide__body > *:nth-child(n+6) { animation-delay: 0.30s; }
-
-@keyframes heroMediaIn {
-  from { opacity: 0; transform: scale(0.92) translateX(-14px); }
-  to   { opacity: 1; transform: scale(1) translateX(0); }
-}
-@keyframes heroBodyIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes heroRiseIn {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
+/* ---- Slide motion ----
+   The carousel now slides HORIZONTALLY like major e-commerce sites (Amazon /
+   Flipkart): the whole track translates sideways and each slide glides in/out
+   as a solid panel. We intentionally do NOT fade/scale the inner content on
+   change anymore — that earlier "entrance" animation masked the slide motion
+   and made it read as a content swap instead of a slide.
+   The .is-entering hook is kept (app.js still toggles it) but is a no-op so the
+   sliding effect stays clean and crisp. */
+.hero-slide__media { will-change: transform; }
 
 .hero-slide__noimg {
   display: flex; align-items: center; justify-content: center;
@@ -1196,10 +1179,7 @@ a.hero-slide__eyebrow:hover { text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) {
   .hero-dot.is-active .hero-dot__fill { animation: none; }
   .hero-dots::before, .hero-dots::after { animation: none; }
-  .hero-carousel__track { transition: transform 0.4s ease; }
-  .hero-slide.is-entering .hero-slide__media,
-  .hero-slide.is-entering .hero-slide__body,
-  .hero-slide.is-entering .hero-slide__body > * { animation: none; }
+  .hero-carousel__track { transition: transform 0.3s ease; }
 }
 
 /* ============================================================
@@ -1669,8 +1649,22 @@ a.hero-slide__eyebrow:hover { text-decoration: underline; }
 .megamenu {
   width: 640px; max-width: calc(100vw - 2rem);
   display: flex; flex-direction: column; gap: 0.5rem;
+  /* Cap height to the space below the sticky header (header ≈ 4.5rem + the
+     menu's own pt-3 gap) so long category lists never overflow off-screen —
+     the menu scrolls internally instead of getting clipped by the viewport. */
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
 @media (min-width: 1100px) { .megamenu { width: 720px; } }
+/* Slim, theme-aware scrollbar for the mega-menu (WebKit/Chromium) */
+.megamenu::-webkit-scrollbar { width: 8px; }
+.megamenu::-webkit-scrollbar-track { background: transparent; }
+.megamenu::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+.megamenu::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); background-clip: padding-box; }
 
 .megamenu__section { padding: 0.35rem 0.25rem; }
 .megamenu__section + .megamenu__section { border-top: 1px solid var(--line); padding-top: 0.7rem; margin-top: 0.1rem; }
