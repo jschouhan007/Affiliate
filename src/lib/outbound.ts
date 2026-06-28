@@ -186,71 +186,12 @@ export function buildInterstitial(
   const safeApp = (app || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
   const display = retailerName.replace(/</g, '&lt;')
 
-  // Build the device-appropriate handoff script.
-  let handoff: string
+  // How long the user has to choose before we auto-open the app.
+  const COUNTDOWN = 5 // seconds
+
+  // No app deep link available (desktop / unknown retailer) → just send to web.
   if (!app) {
-    handoff = `window.location.replace(${JSON.stringify(web)});`
-  } else if (isAndroidIntent) {
-    // ANDROID — the reported bug: the app didn't open (esp. in Brave / non-Chrome
-    // browsers) and the user landed on the web version.
-    //
-    // Root cause: many Android browsers (Brave, Firefox, in-app webviews) BLOCK
-    // an automatic, script-initiated navigation to an `intent://` URL. They only
-    // honour it from a real user gesture (a tap). Chrome auto-launches it, but
-    // others don't — so a pure auto-redirect silently fell through to the web.
-    //
-    // Fix — try BOTH paths, most-reliable first:
-    //   1. Auto-attempt the intent on load (covers Chrome / system WebView).
-    //   2. ALSO render a real <a href="intent://…"> "Open in app" button so a
-    //      single tap reliably fires the intent in Brave/Firefox/etc.
-    //   3. The intent's own S.browser_fallback_url handles "app not installed".
-    // No JS timer racing the OS (that was an earlier, separate bug).
-    handoff = `
-      var app = ${JSON.stringify(app)};
-      function openApp(){ try { window.location.href = app; } catch (e) {} }
-      // Auto-attempt (Chrome / WebView honour this). Tiny delay lets the page
-      // paint the manual button first so Brave/Firefox users have it instantly.
-      setTimeout(openApp, 60);
-      // Wire the visible button to fire the intent from a real user gesture.
-      var btn = document.getElementById('openapp');
-      if (btn) btn.addEventListener('click', function(){ openApp(); });`
-  } else {
-    // iOS: try the custom scheme, fall back to web if the app didn't open.
-    // We watch for the page being hidden (app took over) to cancel the fallback.
-    handoff = `
-      var web = ${JSON.stringify(web)};
-      var app = ${JSON.stringify(app)};
-      var done = false;
-      var start = Date.now();
-      function goWeb(){
-        if (done) return;
-        // If a lot of wall-clock time elapsed, the app likely opened (JS was
-        // suspended) — don't yank the user back to the browser.
-        if (Date.now() - start > 2200) return;
-        done = true;
-        window.location.replace(web);
-      }
-      var hidden = false;
-      document.addEventListener('visibilitychange', function(){
-        if (document.hidden) { hidden = true; done = true; }
-      });
-      window.addEventListener('pagehide', function(){ done = true; });
-      var btn = document.getElementById('openapp');
-      if (btn) btn.addEventListener('click', function(){ done = true; try { window.location.href = app; } catch(e){} });
-      // Attempt the app scheme automatically.
-      try { window.location.href = app; } catch (e) { window.location.replace(web); }
-      // If still here after the grace period and not hidden, go to web.
-      setTimeout(function(){ if (!hidden) goWeb(); }, 1500);`
-  }
-
-  // The "Open in app" button: on Android it's a real intent:// link (so a tap
-  // launches the app even in browsers that block auto-intents); on iOS it's the
-  // custom scheme. Either way it works from a genuine user gesture.
-  const openBtn = app
-    ? `<a id="openapp" class="btn" href="${safeApp}">Open in ${display} app</a>`
-    : ''
-
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta name="robots" content="noindex,nofollow" />
 <title>Opening ${display}…</title>
@@ -259,17 +200,121 @@ export function buildInterstitial(
   .box{padding:2rem;max-width:340px}
   .spin{width:34px;height:34px;border:3px solid rgba(255,255,255,.25);border-top-color:#E5A23D;border-radius:50%;animation:s .8s linear infinite;margin:0 auto 1rem}
   @keyframes s{to{transform:rotate(360deg)}}
-  a{color:#E5A23D}
-  .btn{display:block;margin:1.25rem auto 0;padding:.85rem 1.2rem;border-radius:999px;background:linear-gradient(135deg,#ff7a18,#e6492d 55%,#c81d4a);color:#fff;font-weight:700;text-decoration:none;box-shadow:0 10px 22px -10px rgba(200,29,74,.8)}
+</style></head>
+<body>
+  <div class="box"><div class="spin"></div><p>Opening ${display}…</p></div>
+  <script>(function(){window.location.replace(${JSON.stringify(web)});})();</script>
+</body></html>`
+  }
+
+  // Shared "open the app" implementation differs per platform:
+  //   * ANDROID: navigate to the intent:// URL. Android opens the app if
+  //     installed, else follows S.browser_fallback_url to the web URL. Many
+  //     non-Chrome browsers (Brave/Firefox) only honour this from a user gesture,
+  //     which is why we ALSO keep the manual "Open in app" button as a real <a>.
+  //   * iOS: try the custom scheme; if the app isn't installed the scheme
+  //     dead-ends silently, so we arm a short timer that falls back to web.
+  let openAppFn: string
+  if (isAndroidIntent) {
+    openAppFn = `
+      function openApp(){ try { window.location.href = app; } catch (e) {} }`
+  } else {
+    // iOS: attempting the scheme + a guarded fallback to web if app is missing.
+    openAppFn = `
+      function openApp(){
+        var t0 = Date.now();
+        try { window.location.href = app; } catch (e) { window.location.replace(web); return; }
+        // If we're still visible ~1.6s later, the app almost certainly isn't
+        // installed (a successful launch backgrounds/suspends this page).
+        setTimeout(function(){
+          if (document.hidden) return;            // app took over
+          if (Date.now() - t0 > 2600) return;     // JS was suspended → app opened
+          window.location.replace(web);
+        }, 1600);
+      }`
+  }
+
+  // The countdown handoff: show the timer ticking down; let the user tap either
+  // button at any time; when it reaches 0 auto-open the app (which itself falls
+  // back to web if the app isn't installed).
+  const handoff = `
+    var app = ${JSON.stringify(app)};
+    var web = ${JSON.stringify(web)};
+    var n = ${COUNTDOWN};
+    var fired = false;
+    var hidden = false;
+    document.addEventListener('visibilitychange', function(){ if (document.hidden) hidden = true; });
+    ${openAppFn}
+    function fireApp(){
+      if (fired) return; fired = true;
+      clearInterval(iv);
+      openApp();
+    }
+    var elNum = document.getElementById('count');
+    var elBar = document.getElementById('bar');
+    function render(){
+      if (elNum) elNum.textContent = n;
+      if (elBar) elBar.style.width = ((${COUNTDOWN} - n) / ${COUNTDOWN} * 100) + '%';
+    }
+    render();
+    var iv = setInterval(function(){
+      n -= 1;
+      if (n <= 0){ render(); fireApp(); return; }
+      render();
+    }, 1000);
+    var openBtn = document.getElementById('openapp');
+    if (openBtn) openBtn.addEventListener('click', function(){
+      // Let the real <a href> navigate on Android (user gesture fires intent);
+      // for iOS we still call openApp() to arm the fallback timer.
+      ${isAndroidIntent ? 'fired = true; clearInterval(iv);' : 'fireApp();'}
+    });
+    var webBtn = document.getElementById('fb');
+    if (webBtn) webBtn.addEventListener('click', function(){
+      fired = true; clearInterval(iv); // user chose web — let the <a href> go
+    });`
+
+  // The "Open in app" button: on Android it's a real intent:// link (a tap
+  // launches the app even in browsers that block auto-intents); on iOS it's the
+  // custom scheme. Either way it works from a genuine user gesture.
+  const openBtn = `<a id="openapp" class="btn btn-app" href="${safeApp}">Open in ${display} app</a>`
+  const webBtn = `<a id="fb" class="btn btn-web" href="${safeWeb}">Continue in browser</a>`
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Opening ${display}…</title>
+<style>
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#14100E;color:#EDE3D2;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center}
+  .box{padding:2rem;max-width:360px;width:100%}
+  .ring{position:relative;width:88px;height:88px;margin:0 auto 1.25rem}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .track{stroke:rgba(255,255,255,.12)}
+  .ring .prog{stroke:#E5A23D;stroke-linecap:round;stroke-dasharray:264;stroke-dashoffset:264;animation:dash ${COUNTDOWN}s linear forwards}
+  @keyframes dash{to{stroke-dashoffset:0}}
+  .count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:800;color:#E5A23D}
+  h1{font-size:1.15rem;margin:.2rem 0 .35rem}
+  .sub{font-size:.9rem;opacity:.75;margin:0 0 1.4rem;line-height:1.4}
+  .btn{display:block;margin:.7rem auto 0;padding:.9rem 1.2rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:1rem}
+  .btn-app{background:linear-gradient(135deg,#ff7a18,#e6492d 55%,#c81d4a);color:#fff;box-shadow:0 10px 22px -10px rgba(200,29,74,.8)}
+  .btn-web{background:rgba(255,255,255,.08);color:#EDE3D2;border:1px solid rgba(255,255,255,.16)}
   .btn:active{transform:scale(.97)}
-  .web{display:inline-block;margin-top:1rem;font-size:.85rem;opacity:.75}
+  .progress{height:4px;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden;margin:1.2rem 0 0}
+  .progress > span{display:block;height:100%;width:0;background:#E5A23D;transition:width 1s linear}
 </style></head>
 <body>
   <div class="box">
-    <div class="spin"></div>
-    <p>Opening ${display}…</p>
+    <div class="ring">
+      <svg width="88" height="88" viewBox="0 0 88 88">
+        <circle class="track" cx="44" cy="44" r="42" fill="none" stroke-width="4"></circle>
+        <circle class="prog" cx="44" cy="44" r="42" fill="none" stroke-width="4"></circle>
+      </svg>
+      <div class="count" id="count">${COUNTDOWN}</div>
+    </div>
+    <h1>Opening the ${display} app…</h1>
+    <p class="sub">Opening the app automatically in a few seconds. If it isn't installed, we'll continue in your browser.</p>
     ${openBtn}
-    <a class="web" id="fb" href="${safeWeb}">Continue on web instead</a>
+    ${webBtn}
+    <div class="progress"><span id="bar"></span></div>
   </div>
   <script>
   (function(){${handoff}})();
