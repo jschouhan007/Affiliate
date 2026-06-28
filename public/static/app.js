@@ -593,9 +593,13 @@
     track.addEventListener('touchend', dragEnd);
     track.addEventListener('touchcancel', dragEnd);
 
-    // Mouse drag (desktop) — only the primary button
+    // Mouse drag (desktop) — only the primary button.
+    // preventDefault on mousedown stops the browser from starting a native
+    // image-ghost drag / text selection, which would otherwise swallow the
+    // gesture so mousemove never fires and the carousel wouldn't move.
     track.addEventListener('mousedown', function (e) {
       if (e.button !== 0) return;
+      e.preventDefault();
       dragStart(e.clientX, e.clientY);
     });
     document.addEventListener('mousemove', function (e) {

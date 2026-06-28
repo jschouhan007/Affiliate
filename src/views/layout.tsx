@@ -294,8 +294,7 @@ function Footer(categories: Category[]): string {
             <img src="/static/logo.svg" alt="DealSpot" class="w-7 h-7" />
             <span class="font-serif text-xl font-bold text-ink">DealSpot</span>
           </a>
-          <p class="text-ink-mute text-[0.95rem] leading-relaxed max-w-xs">An independent reviews publication. We research and test products, then recommend only what earns it — with the best current price.</p>
-          <p class="mt-5 text-xs text-ink-faint leading-relaxed">As an Amazon Associate and Flipkart Affiliate, we earn from qualifying purchases. This never influences our verdicts.</p>
+          <p class="text-ink-mute text-[0.95rem] leading-relaxed max-w-xs">An independent reviews publication. We research and test every product hands-on, then recommend only what truly earns it — always paired with the best price we can find.</p>
         </div>
         <div class="md:col-span-2 md:col-start-6">
           <h4 class="eyebrow eyebrow-mute mb-4">Categories</h4>
@@ -314,7 +313,7 @@ function Footer(categories: Category[]): string {
         <div class="md:col-span-2">
           <h4 class="eyebrow eyebrow-mute mb-4">Trust</h4>
           <ul class="space-y-2.5 text-[0.95rem]">
-            <li><a href="/affiliate-disclosure" class="text-ink-mute hover:text-accent transition">Affiliate Disclosure</a></li>
+            <li><a href="/affiliate-disclosure" class="text-ink-mute hover:text-accent transition">Disclosure</a></li>
             <li><a href="/privacy-policy" class="text-ink-mute hover:text-accent transition">Privacy Policy</a></li>
             <li><a href="/terms-of-service" class="text-ink-mute hover:text-accent transition">Terms of Service</a></li>
           </ul>

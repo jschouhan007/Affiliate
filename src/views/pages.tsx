@@ -37,10 +37,9 @@ export function HomePage(data: {
   carousel?: Deal[]
   catalogue?: Deal[]
 }): string {
-  const { categories, featured, latestDeals, pillars, posts, hubs = [], carousel = [], catalogue = [] } = data
+  const { categories, featured, pillars, hubs = [], carousel = [], catalogue = [] } = data
   const lead = featured[0]
   const secondary = featured.slice(1, 4)
-  const restFeatured = featured.slice(4, 8)
 
   const catRow = categories
     .map(
@@ -138,22 +137,9 @@ export function HomePage(data: {
       <div class="grid md:grid-cols-3 gap-8">${pillars.map(PostCard).join('')}</div>
     </section>` : ''}
 
-    ${restFeatured.length || latestDeals.length ? `
-    <section class="py-20 border-t border-line">
-      ${SectionHeader('Recently reviewed', 'Fresh from the bench', { text: 'See more', href: '/deals' })}
-      ${DealGrid((restFeatured.length ? restFeatured : latestDeals).slice(0, 6))}
-    </section>` : ''}
   </div>
 
-  ${NewsletterBox()}
-
-  ${posts.length ? `
-  <div class="max-w-editorial mx-auto px-5">
-    <section class="py-20 border-t border-line">
-      ${SectionHeader('Latest Articles & Guides', 'Reading', { text: 'Buying Guides', href: '/guides' })}
-      <div class="grid md:grid-cols-3 gap-8">${posts.map(PostCard).join('')}</div>
-    </section>
-  </div>` : ''}`
+  ${NewsletterBox()}`
 }
 
 // ============================================================

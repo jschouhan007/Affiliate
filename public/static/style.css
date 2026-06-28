@@ -893,6 +893,10 @@ input[type="checkbox"], input[type="radio"]{ accent-color: var(--accent); width:
   min-width: 100%;
   padding: 2px;               /* room for the glass border glow */
 }
+/* Stop native image-ghost drag & text selection so desktop mouse-drag is smooth
+   (otherwise the browser hijacks the gesture and the carousel won't follow). */
+.hero-carousel__track img { -webkit-user-drag: none; user-select: none; pointer-events: none; }
+.hero-carousel__track { user-select: none; }
 
 /* The glass banner itself */
 .hero-slide__glass {
@@ -1463,8 +1467,13 @@ a.hero-slide__eyebrow:hover { text-decoration: underline; }
 .cat-card__badge {
   position: absolute; top: 0.55rem; right: 0.55rem;
   font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700;
-  color: var(--ink, #2a2018); background: rgba(255,255,255,0.9);
-  padding: 0.2rem 0.5rem; border-radius: 999px; border: 1px solid var(--line, #e7ddcb);
+  /* The pill background is always light, so the label must always be dark —
+     never tie it to --ink (which flips to light in dark mode and camouflages
+     the text against the light pill). */
+  color: #1a1410; background: rgba(255,255,255,0.95);
+  padding: 0.2rem 0.5rem; border-radius: 999px;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 2px 8px -2px rgba(0,0,0,0.35);
 }
 
 .cat-card__body {
