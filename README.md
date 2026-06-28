@@ -114,6 +114,42 @@ A focused pass on the high-impact affiliate-SEO / conversion levers, all edge-na
   decoding + dimension hardening is implemented; format conversion is documented as a
   paid-tier upgrade path.*
 
+### Phase 7 — Deep-Link Fix, Spec Tables & Type-Ahead (Wave 12)
+A focused UX/correctness pass fixing four reported issues.
+- **Mobile deep linking actually opens the installed app** (`src/lib/outbound.ts`,
+  rewritten `/go/:slug` interstitial). The previous build had a racing JS
+  `setTimeout` that forced the **web** version even while the OS was launching the
+  app. Fixed:
+  - **Android** — the `intent://…;package=<pkg>;S.browser_fallback_url=…;end` URL is
+    handed to the OS with **no JS timer at all**; Android natively opens the app, or
+    falls back to the browser via `browser_fallback_url`. Packages: Amazon
+    `com.amazon.mShop.android.shopping`, Flipkart `com.flipkart.android`, Myntra
+    `com.myntra.android`, AJIO `com.ril.ajio`.
+  - **iOS** — retailer custom schemes (`com.amazon.mobile.shopping.web://`,
+    `flipkart://`, `myntra://`) are tried first, with a **guarded** JS timer
+    (visibilitychange / pagehide / elapsed-time aware) that only falls back to web if
+    the app truly didn't open.
+  - **Desktop / unknown** → straight 302 (unchanged).
+- **Clean specification tables** (`src/lib/specs.ts` + `src/views/pages.tsx`). Retailer
+  spec sheets that arrive **jammed** (e.g. `Material compositionPOLYY COTTON`,
+  `PatternSolid`, `Fit typeRegular Fit`) are now parsed by a `KNOWN_LABELS` dictionary
+  (+ `:`/tab delimiter and Title-Case→value heuristics) and rendered as a proper
+  **`<table class="spec-table">`** with label/value columns — replacing the previous
+  garbled run-together text and the inappropriate giant drop-cap. The "Our take" prose
+  block is now gated to **real prose only** (spec sheets never get drop-capped).
+  Editors can paste specs into a new **`spec_summary`** textarea in the product editor.
+- **Admin field autocomplete** (`getFieldSuggestions` + auth-gated
+  `/admin/api/suggest`). Any admin input marked `data-suggest="<field>"` shows a
+  **type-ahead dropdown of previously-used values** as you type (e.g. typing `b` in
+  Brand suggests `boAt`). Sources are whitelisted (`SUGGEST_SOURCES`) to prevent SQL
+  injection; brand / author / author-role inputs are wired. Keyboard-navigable,
+  debounced.
+- **Website search type-ahead** (`getSearchSuggestions` + public
+  `/api/search-suggest` + `searchSuggest()` in `public/static/app.js`). The header
+  search box (desktop + mobile) now shows **live suggestions** — matching **products
+  (with thumbnail), brands and categories** — as you type, Flipkart/Amazon-style.
+  Debounced 150 ms, keyboard-navigable, edge-cached 60 s.
+
 ### Phase 5 — Engagement, SEO & Performance
 - **Dynamic Hub-and-Spoke** (`/best`, `/best/:slug`) — programmatic "best-of" collections that
   pull spoke reviews automatically by rule (`manual` curated picks, `category`, `feature`, or
@@ -279,7 +315,9 @@ products (with prices & buy links), and the hero carousel.**
 | `/blog/:slug` | GET | Single post / pillar guide |
 | `/guides` | GET | Buying guides (pillar pages) |
 | `/search?q=` | GET | Search deals + posts |
-| `/go/:slug?from=` | GET | Affiliate redirect + click logger |
+| `/api/search-suggest?q=` | GET | **Public type-ahead** — products (w/ image), brands, categories (edge-cached 60s) |
+| `/admin/api/suggest?field=&q=` | GET | **Auth-gated** admin field autocomplete (whitelisted sources; 401 if not signed in) |
+| `/go/:slug?from=` | GET | Affiliate redirect + click logger (device-aware app deep linking) |
 | `/api/subscribe` | POST | Newsletter signup (`{email, from}`) |
 | `/affiliate-disclosure`, `/privacy-policy`, `/terms-of-service`, `/about`, `/contact` | GET | Legal / static |
 | `/sitemap.xml`, `/robots.txt`, `/rss.xml` | GET | SEO endpoints |
@@ -371,7 +409,16 @@ npm run db:reset
 - Cloudflare Pages + Workers runtime · Cloudflare D1 (SQLite)
 - Tailwind CSS (CDN) · Font Awesome (CDN)
 
-**Last Updated**: 2026-06-26 — **Wave 11 (affiliate-SEO / performance / deep-linking)**:
+**Last Updated**: 2026-06-28 — **Wave 12 (deep-link fix / spec tables / autocomplete)**:
+fixed mobile deep linking so the **native retailer app actually opens when installed**
+(Android `intent://` handed to the OS with **no racing JS timer** + `browser_fallback_url`;
+iOS custom schemes with a guarded timer fallback) + **clean specification tables**
+(`src/lib/specs.ts` parses jammed retailer spec sheets like `Material compositionPOLYY
+COTTON` via a known-label dictionary and renders a real `<table>`, killing the garbled
+text + drop-cap; new `spec_summary` admin field) + **admin field autocomplete**
+(`/admin/api/suggest` — type `b` → `boAt`; whitelisted sources; brand/author/author-role
+wired) + **website search type-ahead** (`/api/search-suggest` — live products/brands/
+categories dropdown, Amazon/Flipkart-style). · **Wave 11 (affiliate-SEO / performance / deep-linking)**:
 mobile deep linking (native Amazon/Flipkart/Myntra app open with web fallback, Android
 `intent://` + iOS custom schemes via a noindex interstitial) + robust first-party UTM
 tracking (first-touch `ds_attr` cookie + localStorage, preserved across internal nav,
