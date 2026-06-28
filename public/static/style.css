@@ -982,11 +982,22 @@ input[type="checkbox"], input[type="radio"]{ accent-color: var(--accent); width:
   width: 100%; height: 200px; color: rgba(255,255,255,0.8); font-size: 3rem;
 }
 .hero-slide__badge {
-  position: absolute; top: 0.85rem; left: 0.85rem; z-index: 2;
+  position: absolute; top: 0.85rem; left: 0.85rem; z-index: 4;
   font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
   color: #fff; background: rgba(0,0,0,0.42); backdrop-filter: blur(4px);
   padding: 0.3rem 0.65rem; border-radius: 999px; border: 1px solid rgba(255,255,255,0.35);
 }
+
+/* ---- Whole-card link ----
+   Clicking ANYWHERE on the slide card (image, gradient, text) opens the
+   product's details page — EXCEPT the Buy button and other real links, which
+   are lifted above this overlay. Works on both mobile and desktop. */
+.hero-slide__cardlink {
+  position: absolute; inset: 0; z-index: 2;
+  border-radius: 1.6rem;
+  /* purely a click target — no visible styling */
+}
+
 /* Compact buy button shown only on mobile, beneath each product image */
 .hero-slide__mbuy { display: none; }
 
@@ -995,7 +1006,10 @@ input[type="checkbox"], input[type="radio"]{ accent-color: var(--accent); width:
    actions at the SAME vertical position on every slide, so the banner body no
    longer grows/shrinks per product. */
 .hero-slide__body {
-  position: relative; z-index: 1;
+  /* z-index:3 keeps the whole text body (Buy / Details / title / category links)
+     ABOVE the .hero-slide__cardlink overlay (z-index:2) so those controls keep
+     their own destinations; the card-link still covers the image area → details. */
+  position: relative; z-index: 3;
   display: flex; flex-direction: column; justify-content: center;
   gap: 0.55rem;
   padding: 2rem 2.25rem 2rem 0.5rem;

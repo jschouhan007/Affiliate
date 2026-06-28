@@ -121,6 +121,7 @@ export function HeroCarousel(deals: Deal[], sourcePath = '/'): string {
       const mCategory = d.category_name || d.brand || ''
       return `<div class="hero-slide" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${deals.length}" data-index="${i}">
         <div class="hero-slide__glass">
+          <a href="/reviews/${d.slug}" class="hero-slide__cardlink" aria-label="${escapeAttr(d.title)} — view details"></a>
           <div class="hero-slide__media">
             ${d.award ? `<span class="hero-slide__badge">${d.award}</span>` : (d.featured ? `<span class="hero-slide__badge">Editor's Pick</span>` : '')}
             ${d.image_url

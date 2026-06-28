@@ -182,8 +182,8 @@ export function buildInterstitial(
   retailerName: string,
   isAndroidIntent: boolean = false
 ): string {
-  const safeWeb = web.replace(/"/g, '&quot;').replace(/</g, '&lt;')
-  const safeApp = (app || '').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+  const safeWeb = web.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+  const safeApp = (app || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
   const display = retailerName.replace(/</g, '&lt;')
 
   // Build the device-appropriate handoff script.
@@ -191,12 +191,29 @@ export function buildInterstitial(
   if (!app) {
     handoff = `window.location.replace(${JSON.stringify(web)});`
   } else if (isAndroidIntent) {
-    // Android: hand the intent:// straight to the OS. No JS fallback timer —
-    // the intent's S.browser_fallback_url is the fallback. We use a top-level
-    // navigation (location.href) which Chrome/WebView route to the app.
+    // ANDROID — the reported bug: the app didn't open (esp. in Brave / non-Chrome
+    // browsers) and the user landed on the web version.
+    //
+    // Root cause: many Android browsers (Brave, Firefox, in-app webviews) BLOCK
+    // an automatic, script-initiated navigation to an `intent://` URL. They only
+    // honour it from a real user gesture (a tap). Chrome auto-launches it, but
+    // others don't — so a pure auto-redirect silently fell through to the web.
+    //
+    // Fix — try BOTH paths, most-reliable first:
+    //   1. Auto-attempt the intent on load (covers Chrome / system WebView).
+    //   2. ALSO render a real <a href="intent://…"> "Open in app" button so a
+    //      single tap reliably fires the intent in Brave/Firefox/etc.
+    //   3. The intent's own S.browser_fallback_url handles "app not installed".
+    // No JS timer racing the OS (that was an earlier, separate bug).
     handoff = `
-      try { window.location.href = ${JSON.stringify(app)}; }
-      catch (e) { window.location.replace(${JSON.stringify(web)}); }`
+      var app = ${JSON.stringify(app)};
+      function openApp(){ try { window.location.href = app; } catch (e) {} }
+      // Auto-attempt (Chrome / WebView honour this). Tiny delay lets the page
+      // paint the manual button first so Brave/Firefox users have it instantly.
+      setTimeout(openApp, 60);
+      // Wire the visible button to fire the intent from a real user gesture.
+      var btn = document.getElementById('openapp');
+      if (btn) btn.addEventListener('click', function(){ openApp(); });`
   } else {
     // iOS: try the custom scheme, fall back to web if the app didn't open.
     // We watch for the page being hidden (app took over) to cancel the fallback.
@@ -218,11 +235,20 @@ export function buildInterstitial(
         if (document.hidden) { hidden = true; done = true; }
       });
       window.addEventListener('pagehide', function(){ done = true; });
-      // Attempt the app scheme.
+      var btn = document.getElementById('openapp');
+      if (btn) btn.addEventListener('click', function(){ done = true; try { window.location.href = app; } catch(e){} });
+      // Attempt the app scheme automatically.
       try { window.location.href = app; } catch (e) { window.location.replace(web); }
       // If still here after the grace period and not hidden, go to web.
       setTimeout(function(){ if (!hidden) goWeb(); }, 1500);`
   }
+
+  // The "Open in app" button: on Android it's a real intent:// link (so a tap
+  // launches the app even in browsers that block auto-intents); on iOS it's the
+  // custom scheme. Either way it works from a genuine user gesture.
+  const openBtn = app
+    ? `<a id="openapp" class="btn" href="${safeApp}">Open in ${display} app</a>`
+    : ''
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -230,16 +256,20 @@ export function buildInterstitial(
 <title>Opening ${display}…</title>
 <style>
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#14100E;color:#EDE3D2;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center}
-  .box{padding:2rem}
+  .box{padding:2rem;max-width:340px}
   .spin{width:34px;height:34px;border:3px solid rgba(255,255,255,.25);border-top-color:#E5A23D;border-radius:50%;animation:s .8s linear infinite;margin:0 auto 1rem}
   @keyframes s{to{transform:rotate(360deg)}}
   a{color:#E5A23D}
+  .btn{display:block;margin:1.25rem auto 0;padding:.85rem 1.2rem;border-radius:999px;background:linear-gradient(135deg,#ff7a18,#e6492d 55%,#c81d4a);color:#fff;font-weight:700;text-decoration:none;box-shadow:0 10px 22px -10px rgba(200,29,74,.8)}
+  .btn:active{transform:scale(.97)}
+  .web{display:inline-block;margin-top:1rem;font-size:.85rem;opacity:.75}
 </style></head>
 <body>
   <div class="box">
     <div class="spin"></div>
     <p>Opening ${display}…</p>
-    <p style="font-size:.85rem;opacity:.7">Not redirected? <a id="fb" href="${safeWeb}">Tap here to continue</a></p>
+    ${openBtn}
+    <a class="web" id="fb" href="${safeWeb}">Continue on web instead</a>
   </div>
   <script>
   (function(){${handoff}})();
