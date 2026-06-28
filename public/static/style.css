@@ -1129,50 +1129,70 @@ a.hero-slide__eyebrow:hover { text-decoration: underline; }
 }
 .hero-carousel.is-paused .hero-dot.is-active .hero-dot__fill { animation-play-state: paused; }
 
-/* ---- Responsive: stack image over info on small screens ---- */
+/* The mobile category caption under each card is desktop-hidden */
+.hero-slide__mcat { display: none; }
+
+/* ---- Responsive: MOBILE carousel ---- */
 @media (max-width: 760px) {
-  /* MOBILE: show ONLY the product image + a small Buy button beneath it.
-     The full text body is hidden so the carousel reads like the image
-     sliders on Flipkart / Amazon mobile. */
+  /* MOBILE: each slide is a clean rounded-SQUARE card whose product image
+     FULLY COVERS the gradient container (edge-to-edge), with NO buy button.
+     The product's category is shown as plain text beneath the card.
+     (Desktop layout is untouched.) */
   .hero-carousel { padding: 0 0.75rem; }
   .hero-slide__glass {
     grid-template-columns: 1fr;
     height: auto;            /* override desktop fixed height */
     min-height: 0;
-    display: flex; flex-direction: column; align-items: stretch;
-    border-radius: 1.1rem;
+    display: block;
+    border-radius: 1.25rem;
+    aspect-ratio: 1 / 1;     /* perfect rounded square */
+    overflow: hidden;        /* clip the cover image to the rounded corners */
   }
-  .hero-slide__body { display: none; }
+  /* drop the frosted-glass overlays so the cover image fills the gradient
+     edge-to-edge with no haze (desktop keeps them) */
+  .hero-slide__glass::before,
+  .hero-slide__glass::after { display: none; }
+  /* media fills the whole card — no margin/padding so the image reaches the
+     rounded edges and covers the gradient completely */
   .hero-slide__media {
-    margin: 0.85rem; padding: 1.4rem 1.25rem 1.6rem;
-    display: flex; flex-direction: column; align-items: center; gap: 1rem;
-    border-radius: 1.1rem;
-    overflow: visible;        /* allow the buy button to sit naturally */
+    margin: 0; padding: 0;
+    position: absolute; inset: 0;
+    display: block;
+    border-radius: 1.25rem;
+    overflow: hidden;
+    background: transparent;  /* the image covers it entirely */
+    border: none; box-shadow: none; backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
-  /* On mobile the image should fit naturally (contain) above the buy button */
+  /* image covers the entire square card */
   .hero-slide__img {
-    width: auto; height: auto;
-    max-width: 100%; max-height: 210px;
-    object-fit: contain;
+    width: 100%; height: 100%;
+    max-width: none; max-height: none;
+    object-fit: cover;
+    object-position: center;
+    filter: none;
+    border-radius: 1.25rem;
   }
   .hero-slide:hover .hero-slide__img { transform: none; }
-  .hero-slide__noimg { height: 160px; }
-  .hero-slide__mbuy {
-    display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
-    margin-top: 0.25rem;
-    font-size: 0.92rem; font-weight: 700; letter-spacing: 0.01em;
-    color: #fff; text-decoration: none;
-    padding: 0.7rem 1.9rem; border-radius: 999px;
-    background: linear-gradient(135deg, #ff7a18, #e6492d 55%, #c81d4a);
-    box-shadow: 0 10px 22px -10px rgba(200,29,74,0.8), inset 0 1px 0 rgba(255,255,255,0.4);
-    border: 1px solid rgba(255,255,255,0.35);
-    transition: transform 0.15s ease, box-shadow 0.2s ease;
+  .hero-slide__noimg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* hide the text body AND the buy button on mobile */
+  .hero-slide__body { display: none; }
+  .hero-slide__mbuy { display: none !important; }
+
+  /* category caption under the card, normal-weight plain text */
+  .hero-slide__mcat {
+    display: block;
+    text-align: center;
+    margin: 0.7rem 0 0.2rem;
+    font-size: 0.95rem;
+    font-weight: 400;          /* normal font as requested */
+    color: var(--ink, #2a2018);
+    text-decoration: none;
+    letter-spacing: 0.005em;
   }
-  .hero-slide__mbuy:active { transform: scale(0.96); }
-  .hero-slide__mbuy--view {
-    background: rgba(255,255,255,0.92); color: #1a1a2e;
-    box-shadow: 0 8px 18px -10px rgba(0,0,0,0.5);
-  }
+  .hero-slide__mcat:hover { color: var(--accent, #9c3b35); }
+
   .hero-arrow { width: 2rem; height: 2rem; }
   .hero-arrow--prev { left: 0.4rem; }
   .hero-arrow--next { right: 0.4rem; }
@@ -1350,17 +1370,56 @@ a.hero-slide__eyebrow:hover { text-decoration: underline; }
   background: rgba(0,0,0,0.45); backdrop-filter: blur(2px);
 }
 
-/* On mobile the rail becomes a slide-in drawer */
+/* On mobile the rail becomes a slide-in drawer.
+   Layout = sticky header (Filters · X · Clear all) + a scrollable body, so the
+   whole list of filters is always reachable and the header never scrolls away. */
 @media (max-width: 1023px) {
   .cat-filters {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 70;
-    width: min(86vw, 340px); max-width: 340px;
+    width: min(88vw, 360px); max-width: 360px;
+    height: 100%;
+    /* dvh keeps it correct when the mobile URL bar shows/hides */
+    height: 100dvh;
+    background: var(--surface, #fffdf7);
     border-radius: 0 1rem 1rem 0; border-left: none;
     transform: translateX(-105%);
     transition: transform 0.3s cubic-bezier(0.2,0.8,0.2,1);
-    overflow-y: auto;
+    /* the drawer itself does NOT scroll; its body does */
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    padding: 0;                 /* header & body manage their own padding */
   }
   .cat-filters.is-open { transform: translateX(0); box-shadow: 0 0 60px rgba(0,0,0,0.4); }
+
+  /* sticky header pinned to the top of the drawer */
+  .cat-filters__head {
+    flex: 0 0 auto;
+    padding: 1rem 1.1rem;
+    margin: 0;
+    border-bottom: 1px solid var(--line, #e7ddcb);
+    background: var(--surface, #fffdf7);
+  }
+
+  /* everything after the header becomes the scroll body.
+     Using a wrapper would be cleaner, but we scope it with CSS so no markup
+     change is needed: the active-chips + every filter group scroll together. */
+  .cat-filters__active,
+  .cat-filters__group { margin-left: 1.1rem; margin-right: 1.1rem; }
+
+  /* The scroll body: from the first group to the end, in its own scroller.
+     We achieve this by making the aside a flex column and letting the groups
+     flow inside a flex-growing scroll region created via the ::after trick is
+     not possible, so we instead make the non-header content scroll by wrapping
+     it through .cat-filters__body when present, else fall back to scrolling the
+     groups region below. */
+  .cat-filters__body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: 0 0 calc(2rem + env(safe-area-inset-bottom, 0px));
+  }
+
   .cat-filters__close {
     display: inline-flex; align-items: center; justify-content: center;
     margin-left: auto; width: 1.9rem; height: 1.9rem; border-radius: 0.5rem;

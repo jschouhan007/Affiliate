@@ -118,6 +118,7 @@ export function HeroCarousel(deals: Deal[], sourcePath = '/'): string {
         ? `<a href="${buyHref}" rel="nofollow sponsored noopener" target="_blank" class="btn btn-buy hero-slide__buy" title="Buy on ${meta!.name}"><i class="fas fa-cart-shopping text-[0.8rem]"></i> Buy Now <i class="fas fa-arrow-up-right-from-square text-[0.62rem] opacity-80"></i></a>`
         : `<a href="/reviews/${d.slug}" class="btn btn-buy hero-slide__buy">View Product <i class="fas fa-arrow-right text-[0.72rem]"></i></a>`
 
+      const mCategory = d.category_name || d.brand || ''
       return `<div class="hero-slide" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${deals.length}" data-index="${i}">
         <div class="hero-slide__glass">
           <div class="hero-slide__media">
@@ -142,6 +143,7 @@ export function HeroCarousel(deals: Deal[], sourcePath = '/'): string {
             </div>
           </div>
         </div>
+        ${mCategory ? `<a href="${d.category_slug ? `/category/${d.category_slug}` : `/reviews/${d.slug}`}" class="hero-slide__mcat">${mCategory}</a>` : ''}
       </div>`
     })
     .join('')
@@ -494,6 +496,7 @@ function CatalogueFilters(deals: Deal[]): string {
       <button type="button" id="cat-reset" class="cat-filters__reset">Clear all</button>
     </div>
 
+    <div class="cat-filters__body">
     <div class="cat-filters__active" id="cat-active-chips" hidden></div>
 
     <div class="cat-filters__group">
@@ -536,6 +539,7 @@ function CatalogueFilters(deals: Deal[]): string {
       <div class="cat-filters__legend">Features</div>
       <div class="cat-chips">${featureRows}</div>
     </div>` : ''}
+    </div>
   </aside>`
 }
 
