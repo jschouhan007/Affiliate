@@ -10,7 +10,7 @@
 //      outbound URL so the retailer/affiliate network — and our own click log —
 //      know which campaign/article drove the visit.
 // The actual "open app, fall back to web" handoff is done by a tiny HTML
-// interstitial (see buildInterstitial) because a raw 302 to a custom scheme
+// auto-redirect page (see buildAutoRedirect) because a raw 302 to a custom scheme
 // dead-ends when the app isn't installed.
 // ============================================================
 
@@ -180,170 +180,64 @@ function toAndroidIntent(httpsUrl: string, pkg: string): string {
   return `intent://${rest}#Intent;scheme=https;package=${pkg};end`
 }
 
-// ---- Interstitial ------------------------------------------------------------
-// A minimal, instant HTML page that attempts the app deep link then falls back
-// to the web URL. Kept tiny (inline, no external assets) so TTFB stays low and
-// the handoff feels instant. noindex so it never gets crawled/indexed.
+// ---- Auto-redirect (no interstitial screen) ---------------------------------
+// The user explicitly does NOT want any "Open in app / Continue in browser"
+// screen or 5-second countdown. Tapping a Buy link must go straight to the
+// retailer: open the NATIVE APP if installed, otherwise open the WEBSITE in the
+// mobile browser — automatically, with no choice prompt.
 //
-// Two distinct strategies (this is the core of the deep-link fix):
-//   * ANDROID intent:// — navigate to the intent and DO NOTHING else. Android
-//     itself opens the app if installed, or follows S.browser_fallback_url to
-//     the web URL if not. Any JS timer would race the OS and wrongly force the
-//     web version while the app is still launching, which is exactly the bug
-//     the user reported. So for Android we run NO fallback timer at all.
-//   * iOS custom scheme — the scheme dead-ends silently if the app is missing,
-//     so we DO need a JS timer: try the scheme, and if we're still visible after
-//     a grace period (app didn't take over), go to the web URL.
-export function buildInterstitial(
+// How we achieve "app if installed, else website" with zero UI:
+//   * ANDROID — fire an intent:// WITHOUT S.browser_fallback_url. On Brave a
+//     fallback makes the browser skip the app and jump to the website, so we
+//     omit it. The OS launches the installed app. If the app is NOT installed
+//     the intent does nothing and we stay on this page — a short JS timer then
+//     auto-navigates to the WEBSITE. The page itself is invisible (a tiny
+//     spinner only), so the user just sees the app open or the site load.
+//   * iOS — fire the custom app scheme; if the app doesn't take over within a
+//     grace period, auto-navigate to the website.
+// No buttons, no countdown, no second tap.
+export function buildAutoRedirect(
   app: string | undefined,
   web: string,
   retailerName: string,
   isAndroidIntent: boolean = false,
-  intent?: string,
-  webBounce?: string
+  intent?: string
 ): string {
-  // `web`      = the real retailer https URL (used for the app's own fallback).
-  // `webBounce`= a URL on OUR domain that meta-refreshes to the retailer page.
-  //   Used for the "Continue in browser" button so Android's App-Link hijack
-  //   (which would throw the user into the retailer app) is avoided — the hop
-  //   stays on our non-verified domain. Falls back to `web` if not provided.
-  const browserUrl = webBounce || web
-  const safeWeb = browserUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
-  const safeApp = (app || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
   const display = retailerName.replace(/</g, '&lt;')
 
-  // How long the user has to choose before we auto-open the app.
-  const COUNTDOWN = 5 // seconds
-
-  // No app deep link available (desktop / unknown retailer) → just send to web.
+  // No app deep link (desktop / unknown retailer) — just go to the web URL.
   if (!app) {
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta name="robots" content="noindex,nofollow" />
 <title>Opening ${display}…</title>
-<style>
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#14100E;color:#EDE3D2;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center}
-  .box{padding:2rem;max-width:340px}
-  .spin{width:34px;height:34px;border:3px solid rgba(255,255,255,.25);border-top-color:#E5A23D;border-radius:50%;animation:s .8s linear infinite;margin:0 auto 1rem}
-  @keyframes s{to{transform:rotate(360deg)}}
-</style></head>
-<body>
-  <div class="box"><div class="spin"></div><p>Opening ${display}…</p></div>
-  <script>(function(){window.location.replace(${JSON.stringify(web)});})();</script>
-</body></html>`
+<script>(function(){window.location.replace(${JSON.stringify(web)});})();</script>
+</head><body></body></html>`
   }
 
-  // The countdown handoff. Two completely separate, correctly-labelled actions:
-  //
-  //   OPEN IN APP  → open the native app.
-  //     * Android: navigate to the PLAIN https App Link (app = web URL). This is
-  //       what reliably launches the installed app across browsers — including
-  //       Brave, where the old intent:// link was being diverted to the website.
-  //       We ALSO fire the intent:// a moment later as a Chrome booster.
-  //     * iOS: navigate to the custom scheme, with a guarded timer that falls
-  //       back to web only if the app clearly isn't installed.
-  //
-  //   CONTINUE IN BROWSER → stay in the browser, never the app.
-  //     * The hazard: a plain https retailer link is an Android App Link, so the
-  //       OS may hijack it into the app (this is why "Continue in browser" was
-  //       wrongly opening the app before). We defeat that by opening the web URL
-  //       in a NEW browser tab via window.open(url,'_blank'), which browsers
-  //       treat as an in-browser navigation rather than an app-link launch.
-  //
-  //   TIMER ENDS (user did nothing) → open the WEBSITE (the gentle default).
-  //     Only an explicit "Open in app" tap launches the native app.
   const isAndroid = isAndroidIntent
-  const openAppFn = isAndroid
-    ? `
-      function openApp(){
-        var t0 = Date.now();
-        // Fire the intent:// WITHOUT a browser_fallback_url. Brave can't divert
-        // it to the website (there's nowhere to divert to), so it launches the
-        // installed app. If the app ISN'T installed the intent throws / does
-        // nothing and we stay on this page — so a guarded timer then sends the
-        // user to the WEBSITE (never silently fail).
-        ${intent ? `try { window.location.href = ${JSON.stringify(intent)}; } catch (e) {}` : `try { window.location.href = app; } catch (e) {}`}
-        setTimeout(function(){
-          if (document.hidden || hidden) return;  // app took over → page hidden
-          if (Date.now() - t0 > 2600) return;     // JS was suspended → app opened
-          // App did not open (not installed): continue to the WEBSITE.
-          try { window.location.replace(web); } catch (e) {}
-        }, 1600);
-      }`
-    : `
-      function openApp(){
-        var t0 = Date.now();
-        try { window.location.href = app; } catch (e) { window.location.replace(web); return; }
-        // iOS custom scheme dead-ends silently if the app is missing; if we're
-        // still visible ~1.6s later, fall back to the web URL.
-        setTimeout(function(){
-          if (document.hidden) return;            // app took over
-          if (Date.now() - t0 > 2600) return;     // JS suspended → app opened
-          window.location.replace(web);
-        }, 1600);
-      }`
+  // Primary "open the app" navigation target.
+  const appTarget = isAndroid && intent ? intent : app
 
-  // "Continue in browser": the hard part. A plain https retailer URL is an
-  // Android App Link, so if the user has the retailer's "open supported links"
-  // enabled, the OS hands ANY navigation to that domain straight to the app —
-  // window.open / new tab don't escape it. The one lever a website reliably has
-  // is a META-REFRESH (a timed client refresh) rather than a link click /
-  // location assignment: Android treats App-Link interception as happening on a
-  // navigation gesture, and a meta refresh from our own (non-verified) domain is
-  // commonly NOT intercepted. So we navigate to our own /web/<token> bounce page
-  // which renders a <meta http-equiv="refresh"> to the retailer URL.
-  const goWebFn = `
-      function goWeb(){
-        fired = true; clearInterval(iv);
-        try { window.location.href = browserUrl; } catch (e) {}
-      }`
-
+  // The whole handoff: fire the app link immediately, then auto-fall back to the
+  // website if the app didn't take over (i.e. it isn't installed).
   const handoff = `
-    var app = ${JSON.stringify(app)};
     var web = ${JSON.stringify(web)};
-    var browserUrl = ${JSON.stringify(browserUrl)};
-    var n = ${COUNTDOWN};
-    var fired = false;
+    var appTarget = ${JSON.stringify(appTarget)};
+    var t0 = Date.now();
     var hidden = false;
     document.addEventListener('visibilitychange', function(){ if (document.hidden) hidden = true; });
-    ${openAppFn}
-    ${goWebFn}
-    function fireApp(){
-      if (fired) return; fired = true;
-      clearInterval(iv);
-      openApp();
-    }
-    var elNum = document.getElementById('count');
-    var elBar = document.getElementById('bar');
-    function render(){
-      if (elNum) elNum.textContent = n;
-      if (elBar) elBar.style.width = ((${COUNTDOWN} - n) / ${COUNTDOWN} * 100) + '%';
-    }
-    render();
-    var iv = setInterval(function(){
-      n -= 1;
-      // NEW behaviour: if the user does nothing, the countdown opens the
-      // WEBSITE (not the app). Only an explicit "Open in app" tap opens the app.
-      if (n <= 0){ render(); goWeb(); return; }
-      render();
-    }, 1000);
-    var openBtn = document.getElementById('openapp');
-    if (openBtn) openBtn.addEventListener('click', function(ev){
-      ev.preventDefault();        // we drive the navigation ourselves
-      fireApp();
-    });
-    var webBtn = document.getElementById('fb');
-    if (webBtn) webBtn.addEventListener('click', function(ev){
-      ev.preventDefault();        // stop the App-Link <a href> hijack
+    function goWeb(){ try { window.location.replace(web); } catch (e) {} }
+    // Fire the native-app link straight away.
+    try { window.location.href = appTarget; } catch (e) { goWeb(); }
+    // If the app opened, the page goes to the background (hidden) and/or JS is
+    // suspended; in that case do NOT redirect. Otherwise (app not installed),
+    // send the user to the website automatically.
+    setTimeout(function(){
+      if (document.hidden || hidden) return;     // app took over
+      if (Date.now() - t0 > 1600) return;        // JS was suspended -> app opened
       goWeb();
-    });`
-
-  // Both buttons are real <a> (so they work even if JS is slow) but JS
-  // intercepts the click to guarantee the correct app-vs-browser behaviour.
-  // The "Open in app" href is the app deep link; "Continue in browser" href is
-  // the plain web URL.
-  const openBtn = `<a id="openapp" class="btn btn-app" href="${safeApp}">Open in ${display} app</a>`
-  const webBtn = `<a id="fb" class="btn btn-web" href="${safeWeb}">Continue in browser</a>`
+    }, ${isAndroid ? 1200 : 1500});`
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -351,82 +245,17 @@ export function buildInterstitial(
 <title>Opening ${display}…</title>
 <style>
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#14100E;color:#EDE3D2;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center}
-  .box{padding:2rem;max-width:360px;width:100%}
-  .ring{position:relative;width:88px;height:88px;margin:0 auto 1.25rem}
-  .ring svg{transform:rotate(-90deg)}
-  .ring .track{stroke:rgba(255,255,255,.12)}
-  .ring .prog{stroke:#E5A23D;stroke-linecap:round;stroke-dasharray:264;stroke-dashoffset:264;animation:dash ${COUNTDOWN}s linear forwards}
-  @keyframes dash{to{stroke-dashoffset:0}}
-  .count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:800;color:#E5A23D}
-  h1{font-size:1.15rem;margin:.2rem 0 .35rem}
-  .sub{font-size:.9rem;opacity:.75;margin:0 0 1.4rem;line-height:1.4}
-  .btn{display:block;margin:.7rem auto 0;padding:.9rem 1.2rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:1rem}
-  .btn-app{background:linear-gradient(135deg,#ff7a18,#e6492d 55%,#c81d4a);color:#fff;box-shadow:0 10px 22px -10px rgba(200,29,74,.8)}
-  .btn-web{background:rgba(255,255,255,.08);color:#EDE3D2;border:1px solid rgba(255,255,255,.16)}
-  .btn:active{transform:scale(.97)}
-  .progress{height:4px;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden;margin:1.2rem 0 0}
-  .progress > span{display:block;height:100%;width:0;background:#E5A23D;transition:width 1s linear}
+  .box{padding:2rem}
+  .spin{width:34px;height:34px;border:3px solid rgba(255,255,255,.25);border-top-color:#E5A23D;border-radius:50%;animation:s .8s linear infinite;margin:0 auto 1rem}
+  @keyframes s{to{transform:rotate(360deg)}}
+  p{opacity:.8;font-size:.95rem;margin:0}
 </style></head>
 <body>
-  <div class="box">
-    <div class="ring">
-      <svg width="88" height="88" viewBox="0 0 88 88">
-        <circle class="track" cx="44" cy="44" r="42" fill="none" stroke-width="4"></circle>
-        <circle class="prog" cx="44" cy="44" r="42" fill="none" stroke-width="4"></circle>
-      </svg>
-      <div class="count" id="count">${COUNTDOWN}</div>
-    </div>
-    <h1>Continue to ${display}</h1>
-    <p class="sub">Tap <b>Open in ${display} app</b> to jump into the app, or keep reading in your browser. We'll open the website automatically in a few seconds.</p>
-    ${openBtn}
-    ${webBtn}
-    <div class="progress"><span id="bar"></span></div>
-  </div>
-  <script>
-  (function(){${handoff}})();
-  </script>
+  <div class="box"><div class="spin"></div><p>Opening ${display}…</p></div>
+  <script>(function(){${handoff}})();</script>
 </body></html>`
 }
 
 export function retailerDisplayName(r: Retailer): string {
   return { amazon: 'Amazon', flipkart: 'Flipkart', myntra: 'Myntra', ajio: 'AJIO', other: 'the store' }[r]
-}
-
-// ---- "Continue in browser" bounce page --------------------------------------
-// Served from OUR domain (/web?u=<encoded retailer url>) when the user explicitly
-// chose to stay in the browser. The trick: reach the retailer page via a
-// <meta http-equiv="refresh"> from our own (non-App-Link-verified) domain
-// instead of a link click / 302. Android's App-Link interception fires on a
-// navigation gesture to the verified domain; a timed meta refresh originating on
-// our domain is generally NOT intercepted, so the retailer site loads inside the
-// browser as the user asked. We also add a JS belt-and-braces refresh.
-export function buildWebBounce(destUrl: string, retailerName: string): string {
-  const display = retailerName.replace(/</g, '&lt;')
-  const safe = destUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<meta name="robots" content="noindex,nofollow" />
-<meta http-equiv="refresh" content="0; url=${safe}" />
-<title>Opening ${display} in your browser…</title>
-<style>
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#14100E;color:#EDE3D2;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center}
-  .box{padding:2rem;max-width:340px}
-  .spin{width:34px;height:34px;border:3px solid rgba(255,255,255,.25);border-top-color:#E5A23D;border-radius:50%;animation:s .8s linear infinite;margin:0 auto 1rem}
-  @keyframes s{to{transform:rotate(360deg)}}
-  a{color:#E5A23D}
-</style></head>
-<body>
-  <div class="box">
-    <div class="spin"></div>
-    <p>Opening ${display} in your browser…</p>
-    <p><a href="${safe}">Tap here if it doesn't load</a></p>
-  </div>
-  <script>
-  (function(){
-    // Belt-and-braces: if the meta refresh hasn't navigated shortly, do it via
-    // JS (still a same-document timer navigation, not an app-link click).
-    setTimeout(function(){ try { window.location.replace(${JSON.stringify(destUrl)}); } catch (e) {} }, 400);
-  })();
-  </script>
-</body></html>`
 }

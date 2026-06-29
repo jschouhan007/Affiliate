@@ -447,14 +447,12 @@ app.get('/go/:slug', async (c) => {
       .catch(() => {})
   )
 
-  // On mobile with a known app, serve a tiny interstitial that opens the native
-  // app and falls back to the web URL — drastically cutting checkout friction.
+  // On mobile with a known app, serve a tiny invisible auto-redirect page that
+  // opens the native app if installed, otherwise sends the user to the website —
+  // automatically, with NO interstitial screen / countdown / button choice.
   if (useDeepLink) {
-    // Bounce URL on our own domain for the "Continue in browser" choice — keeps
-    // the user in the browser by avoiding the retailer's Android App-Link hijack.
-    const webBounce = `/web?u=${encodeURIComponent(web)}&r=${encodeURIComponent(retailer)}`
     return c.html(
-      Outbound.buildInterstitial(appLink, web, Outbound.retailerDisplayName(retailer), !!isAndroidIntent, intent, webBounce),
+      Outbound.buildAutoRedirect(appLink, web, Outbound.retailerDisplayName(retailer), !!isAndroidIntent, intent),
       200,
       { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' }
     )
@@ -462,33 +460,6 @@ app.get('/go/:slug', async (c) => {
 
   // Desktop / unknown: 302 straight through (retailers see a fresh click).
   return c.redirect(web, 302)
-})
-
-// "Continue in browser" bounce page. Reaches the retailer site via a meta
-// refresh from our own domain so Android doesn't hijack it into the retailer
-// app (which is what was happening on the plain https link). Only same-host
-// http(s) retailer URLs are honoured, to avoid an open-redirect.
-app.get('/web', (c) => {
-  const u = c.req.query('u') || ''
-  const r = c.req.query('r') || ''
-  let dest: string
-  try {
-    const parsed = new URL(u)
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return c.redirect('/', 302)
-    // Only bounce to recognised retailer hosts — prevents the /web endpoint from
-    // being abused as an open redirect to arbitrary domains. Detect from the URL
-    // host ALONE (ignore the r hint) so a forged hint can't whitelist any host.
-    if (Outbound.detectRetailer(parsed.toString()) === 'other') return c.redirect('/', 302)
-    dest = parsed.toString()
-  } catch {
-    return c.redirect('/', 302)
-  }
-  const retailer = Outbound.detectRetailer(dest, r) as any
-  return c.html(
-    Outbound.buildWebBounce(dest, Outbound.retailerDisplayName(retailer)),
-    200,
-    { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' }
-  )
 })
 
 // ============================================================
