@@ -1195,21 +1195,35 @@ a.hero-slide__eyebrow:hover { text-decoration: underline; }
   .hero-slide__body { display: none; }
   .hero-slide__mbuy { display: none !important; }
 
-  /* The dots now live INSIDE the viewport (see markup), so they pin to the
-     bottom edge of the square IMAGE — over the picture, never over the caption
-     that sits below the card. Keep them compact on mobile. */
+  /* LAYOUT MODEL (mobile):
+       viewport  = square image (top)  +  caption strip (fixed height, bottom)
+     The dots overlay the BOTTOM OF THE SQUARE IMAGE; the caption lives in the
+     reserved strip BELOW the square, so the two never overlap.
+     We give the caption strip a fixed height (--cap-h) and pin the dots exactly
+     that distance up from the viewport bottom — so the dots always sit over the
+     image, just above the caption, regardless of device width. */
+  .hero-carousel { --cap-h: 2.4rem; }
+
+  /* dots sit just inside the bottom edge of the SQUARE image */
   .hero-dots {
-    bottom: 0.6rem;
+    bottom: calc(var(--cap-h) + 0.5rem);
     padding: 0.26rem 0.5rem;
     gap: 0.34rem;
   }
 
-  /* Category caption sits in its OWN row clearly below the card + dots.
-     Same font-size as before, but a more stylish refined italic serif. */
+  /* the caption occupies its own reserved strip below the square; single line,
+     centred, never wraps (ellipsis if too long) so the strip height is stable */
   .hero-slide__mcat {
-    display: block;
-    text-align: center;
-    margin: 0.85rem 0.5rem 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--cap-h);
+    margin: 0;
+    padding: 0 0.75rem;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-size: 0.95rem;        /* SAME size as before */
     /* more stylish: the brand's elegant serif in a refined italic (this face +
        its italic 500 weight are already loaded site-wide) */
