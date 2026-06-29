@@ -197,9 +197,16 @@ export function buildInterstitial(
   web: string,
   retailerName: string,
   isAndroidIntent: boolean = false,
-  intent?: string
+  intent?: string,
+  webBounce?: string
 ): string {
-  const safeWeb = web.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+  // `web`      = the real retailer https URL (used for the app's own fallback).
+  // `webBounce`= a URL on OUR domain that meta-refreshes to the retailer page.
+  //   Used for the "Continue in browser" button so Android's App-Link hijack
+  //   (which would throw the user into the retailer app) is avoided — the hop
+  //   stays on our non-verified domain. Falls back to `web` if not provided.
+  const browserUrl = webBounce || web
+  const safeWeb = browserUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
   const safeApp = (app || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
   const display = retailerName.replace(/</g, '&lt;')
 
@@ -247,12 +254,11 @@ export function buildInterstitial(
   const openAppFn = isAndroid
     ? `
       function openApp(){
-        // Primary: the https App Link reliably opens the installed app
-        // (Brave/Chrome/Firefox). If the app isn't installed it just loads the
-        // web page — the desired fallback.
+        // Fire the intent:// — the most direct way to launch the installed app.
+        // Its S.browser_fallback_url handles "app not installed" automatically.
+        ${intent ? `try { window.location.href = ${JSON.stringify(intent)}; return; } catch (e) {}` : ''}
+        // Fallback: plain https App Link.
         try { window.location.href = app; } catch (e) {}
-        // Booster for vanilla Chrome: also fire the intent:// shortly after.
-        ${intent ? `try { var i = ${JSON.stringify(intent)}; setTimeout(function(){ if (!document.hidden) window.location.href = i; }, 350); } catch (e) {}` : ''}
       }`
     : `
       function openApp(){
@@ -267,26 +273,25 @@ export function buildInterstitial(
         }, 1600);
       }`
 
-  // "Continue in browser": force a real browser navigation, not an app launch.
-  const goWebFn = isAndroid
-    ? `
+  // "Continue in browser": the hard part. A plain https retailer URL is an
+  // Android App Link, so if the user has the retailer's "open supported links"
+  // enabled, the OS hands ANY navigation to that domain straight to the app —
+  // window.open / new tab don't escape it. The one lever a website reliably has
+  // is a META-REFRESH (a timed client refresh) rather than a link click /
+  // location assignment: Android treats App-Link interception as happening on a
+  // navigation gesture, and a meta refresh from our own (non-verified) domain is
+  // commonly NOT intercepted. So we navigate to our own /web/<token> bounce page
+  // which renders a <meta http-equiv="refresh"> to the retailer URL.
+  const goWebFn = `
       function goWeb(){
         fired = true; clearInterval(iv);
-        // Opening in a new tab keeps it inside the browser (avoids the OS
-        // App-Link hijack that was wrongly opening the app).
-        var w = null;
-        try { w = window.open(web, '_blank'); } catch (e) {}
-        if (!w) { try { window.location.href = web; } catch (e) {} }
-      }`
-    : `
-      function goWeb(){
-        fired = true; clearInterval(iv);
-        try { window.location.href = web; } catch (e) {}
+        try { window.location.href = browserUrl; } catch (e) {}
       }`
 
   const handoff = `
     var app = ${JSON.stringify(app)};
     var web = ${JSON.stringify(web)};
+    var browserUrl = ${JSON.stringify(browserUrl)};
     var n = ${COUNTDOWN};
     var fired = false;
     var hidden = false;
@@ -326,7 +331,7 @@ export function buildInterstitial(
   // The "Open in app" href is the app deep link; "Continue in browser" href is
   // the plain web URL.
   const openBtn = `<a id="openapp" class="btn btn-app" href="${safeApp}">Open in ${display} app</a>`
-  const webBtn = `<a id="fb" class="btn btn-web" href="${safeWeb}" target="_blank" rel="noopener">Continue in browser</a>`
+  const webBtn = `<a id="fb" class="btn btn-web" href="${safeWeb}">Continue in browser</a>`
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -373,4 +378,43 @@ export function buildInterstitial(
 
 export function retailerDisplayName(r: Retailer): string {
   return { amazon: 'Amazon', flipkart: 'Flipkart', myntra: 'Myntra', ajio: 'AJIO', other: 'the store' }[r]
+}
+
+// ---- "Continue in browser" bounce page --------------------------------------
+// Served from OUR domain (/web?u=<encoded retailer url>) when the user explicitly
+// chose to stay in the browser. The trick: reach the retailer page via a
+// <meta http-equiv="refresh"> from our own (non-App-Link-verified) domain
+// instead of a link click / 302. Android's App-Link interception fires on a
+// navigation gesture to the verified domain; a timed meta refresh originating on
+// our domain is generally NOT intercepted, so the retailer site loads inside the
+// browser as the user asked. We also add a JS belt-and-braces refresh.
+export function buildWebBounce(destUrl: string, retailerName: string): string {
+  const display = retailerName.replace(/</g, '&lt;')
+  const safe = destUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="robots" content="noindex,nofollow" />
+<meta http-equiv="refresh" content="0; url=${safe}" />
+<title>Opening ${display} in your browser…</title>
+<style>
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#14100E;color:#EDE3D2;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center}
+  .box{padding:2rem;max-width:340px}
+  .spin{width:34px;height:34px;border:3px solid rgba(255,255,255,.25);border-top-color:#E5A23D;border-radius:50%;animation:s .8s linear infinite;margin:0 auto 1rem}
+  @keyframes s{to{transform:rotate(360deg)}}
+  a{color:#E5A23D}
+</style></head>
+<body>
+  <div class="box">
+    <div class="spin"></div>
+    <p>Opening ${display} in your browser…</p>
+    <p><a href="${safe}">Tap here if it doesn't load</a></p>
+  </div>
+  <script>
+  (function(){
+    // Belt-and-braces: if the meta refresh hasn't navigated shortly, do it via
+    // JS (still a same-document timer navigation, not an app-link click).
+    setTimeout(function(){ try { window.location.replace(${JSON.stringify(destUrl)}); } catch (e) {} }, 400);
+  })();
+  </script>
+</body></html>`
 }
