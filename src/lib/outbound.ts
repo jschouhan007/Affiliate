@@ -143,17 +143,16 @@ export function buildDeepLinks(
   if (device === 'android') {
     const pkg = RETAILER_ANDROID_PKG[retailer]
     if (!pkg) return { web }
-    // IMPORTANT (the Brave bug): we do NOT use the intent:// URL as the primary
-    // "open app" action any more.
-    //   * Brave/Firefox, when handed an intent:// with S.browser_fallback_url,
-    //     tend to IGNORE the app and just follow the fallback → the website.
-    //   * Meanwhile a PLAIN https:// retailer URL is a verified Android App
-    //     Link, so the OS opens the installed app directly. That's exactly why,
-    //     in the user's report, "Continue in browser" (a plain https link) was
-    //     the one that actually opened the app.
-    // So: `app` = the plain https App Link (opens the app reliably across
-    // browsers). We still expose the intent:// separately as a secondary attempt
-    // for vanilla Chrome where it's the most direct app launcher.
+    // THE FIX (Brave/Chrome inversion):
+    //   * "Open in app" must use an intent:// WITHOUT S.browser_fallback_url.
+    //     With a fallback baked in, Brave ignores the app and silently follows
+    //     the fallback → the website (that was the bug: "Open in app" → website).
+    //     Strip the fallback and Brave has nowhere to divert to, so it launches
+    //     the installed app. If the app isn't installed it throws (browser shows
+    //     an error) — so the interstitial runs a JS timer that sends the user to
+    //     the WEBSITE only if the app clearly didn't take over.
+    //   * `app` (the plain https App Link) is kept ONLY as a last-resort booster
+    //     for vanilla Chrome; the no-fallback intent is the primary launcher.
     return {
       app: destUrl,
       web,
@@ -174,8 +173,11 @@ export function buildDeepLinks(
 // inside the intent so Android matches the retailer's verified App Link filter.
 function toAndroidIntent(httpsUrl: string, pkg: string): string {
   const rest = httpsUrl.replace(/^https?:\/\//, '')
-  const fallback = encodeURIComponent(httpsUrl)
-  return `intent://${rest}#Intent;scheme=https;package=${pkg};S.browser_fallback_url=${fallback};end`
+  // NO S.browser_fallback_url on purpose. A fallback makes Brave skip the app
+  // and follow the fallback straight to the website. Without it, Brave must
+  // launch the installed app (or throw ActivityNotFoundException if it's not
+  // installed — which the interstitial's JS timer handles by going to the web).
+  return `intent://${rest}#Intent;scheme=https;package=${pkg};end`
 }
 
 // ---- Interstitial ------------------------------------------------------------
@@ -248,17 +250,25 @@ export function buildInterstitial(
   //       in a NEW browser tab via window.open(url,'_blank'), which browsers
   //       treat as an in-browser navigation rather than an app-link launch.
   //
-  //   TIMER ENDS → same as OPEN IN APP (open the native app, fall back to web
-  //   automatically if it isn't installed).
+  //   TIMER ENDS (user did nothing) → open the WEBSITE (the gentle default).
+  //     Only an explicit "Open in app" tap launches the native app.
   const isAndroid = isAndroidIntent
   const openAppFn = isAndroid
     ? `
       function openApp(){
-        // Fire the intent:// — the most direct way to launch the installed app.
-        // Its S.browser_fallback_url handles "app not installed" automatically.
-        ${intent ? `try { window.location.href = ${JSON.stringify(intent)}; return; } catch (e) {}` : ''}
-        // Fallback: plain https App Link.
-        try { window.location.href = app; } catch (e) {}
+        var t0 = Date.now();
+        // Fire the intent:// WITHOUT a browser_fallback_url. Brave can't divert
+        // it to the website (there's nowhere to divert to), so it launches the
+        // installed app. If the app ISN'T installed the intent throws / does
+        // nothing and we stay on this page — so a guarded timer then sends the
+        // user to the WEBSITE (never silently fail).
+        ${intent ? `try { window.location.href = ${JSON.stringify(intent)}; } catch (e) {}` : `try { window.location.href = app; } catch (e) {}`}
+        setTimeout(function(){
+          if (document.hidden || hidden) return;  // app took over → page hidden
+          if (Date.now() - t0 > 2600) return;     // JS was suspended → app opened
+          // App did not open (not installed): continue to the WEBSITE.
+          try { window.location.replace(web); } catch (e) {}
+        }, 1600);
       }`
     : `
       function openApp(){
@@ -312,7 +322,9 @@ export function buildInterstitial(
     render();
     var iv = setInterval(function(){
       n -= 1;
-      if (n <= 0){ render(); fireApp(); return; }
+      // NEW behaviour: if the user does nothing, the countdown opens the
+      // WEBSITE (not the app). Only an explicit "Open in app" tap opens the app.
+      if (n <= 0){ render(); goWeb(); return; }
       render();
     }, 1000);
     var openBtn = document.getElementById('openapp');
@@ -364,8 +376,8 @@ export function buildInterstitial(
       </svg>
       <div class="count" id="count">${COUNTDOWN}</div>
     </div>
-    <h1>Opening the ${display} app…</h1>
-    <p class="sub">Opening the app automatically in a few seconds. If it isn't installed, we'll continue in your browser.</p>
+    <h1>Continue to ${display}</h1>
+    <p class="sub">Tap <b>Open in ${display} app</b> to jump into the app, or keep reading in your browser. We'll open the website automatically in a few seconds.</p>
     ${openBtn}
     ${webBtn}
     <div class="progress"><span id="bar"></span></div>
