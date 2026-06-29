@@ -136,28 +136,27 @@ export function buildDeepLinks(
   destUrl: string,
   retailer: Retailer,
   device: Device
-): { app?: string; web: string; isAndroidIntent?: boolean; intent?: string } {
+): { app?: string; web: string; isAndroidIntent?: boolean } {
   const web = destUrl
   if (device === 'desktop') return { web }
 
   if (device === 'android') {
     const pkg = RETAILER_ANDROID_PKG[retailer]
     if (!pkg) return { web }
-    // THE FIX (Brave/Chrome inversion):
-    //   * "Open in app" must use an intent:// WITHOUT S.browser_fallback_url.
-    //     With a fallback baked in, Brave ignores the app and silently follows
-    //     the fallback → the website (that was the bug: "Open in app" → website).
-    //     Strip the fallback and Brave has nowhere to divert to, so it launches
-    //     the installed app. If the app isn't installed it throws (browser shows
-    //     an error) — so the interstitial runs a JS timer that sends the user to
-    //     the WEBSITE only if the app clearly didn't take over.
-    //   * `app` (the plain https App Link) is kept ONLY as a last-resort booster
-    //     for vanilla Chrome; the no-fallback intent is the primary launcher.
+    // THE FIX (Play Store "not available in your country" bug):
+    //   We DO NOT use a package-scoped intent:// any more. An intent:// with
+    //   `package=com.amazon...` falls back to the PLAY STORE for that package
+    //   when Android decides nothing matched — which is the Play Store screen
+    //   the user saw even though the app WAS installed.
+    //   Instead we hand back the PLAIN https://www.amazon.in/... URL. It is a
+    //   verified Android App Link, so the OS routes it straight into the
+    //   INSTALLED app; and if the app isn't installed, the very same https URL
+    //   simply loads the WEBSITE in the browser — exactly the fallback we want,
+    //   with zero Play Store drama and no JS timer needed.
     return {
-      app: destUrl,
+      app: destUrl, // plain https App Link — opens app if installed, else website
       web,
       isAndroidIntent: true,
-      intent: toAndroidIntent(destUrl, pkg),
     }
   }
 
@@ -167,18 +166,6 @@ export function buildDeepLinks(
   return { app: destUrl.replace(/^https?:\/\//, scheme), web, isAndroidIntent: false }
 }
 
-// Build an Android intent:// URL with a browser fallback baked in. If the app
-// isn't installed, Chrome follows S.browser_fallback_url back to the web URL.
-// We strip the https:// scheme from the host portion and declare scheme=https
-// inside the intent so Android matches the retailer's verified App Link filter.
-function toAndroidIntent(httpsUrl: string, pkg: string): string {
-  const rest = httpsUrl.replace(/^https?:\/\//, '')
-  // NO S.browser_fallback_url on purpose. A fallback makes Brave skip the app
-  // and follow the fallback straight to the website. Without it, Brave must
-  // launch the installed app (or throw ActivityNotFoundException if it's not
-  // installed — which the interstitial's JS timer handles by going to the web).
-  return `intent://${rest}#Intent;scheme=https;package=${pkg};end`
-}
 
 // ---- Auto-redirect (no interstitial screen) ---------------------------------
 // The user explicitly does NOT want any "Open in app / Continue in browser"
@@ -200,8 +187,7 @@ export function buildAutoRedirect(
   app: string | undefined,
   web: string,
   retailerName: string,
-  isAndroidIntent: boolean = false,
-  intent?: string
+  isAndroidIntent: boolean = false
 ): string {
   const display = retailerName.replace(/</g, '&lt;')
 
@@ -216,28 +202,33 @@ export function buildAutoRedirect(
   }
 
   const isAndroid = isAndroidIntent
-  // Primary "open the app" navigation target.
-  const appTarget = isAndroid && intent ? intent : app
 
-  // The whole handoff: fire the app link immediately, then auto-fall back to the
-  // website if the app didn't take over (i.e. it isn't installed).
-  const handoff = `
+  // ANDROID: the app link IS the plain https URL. Navigating to it lets Android
+  // open the installed app (verified App Link) or, if the app is absent, load
+  // the website in the browser — automatically. We do NOT run a JS fallback
+  // timer here: the https navigation already resolves to app-or-website, and a
+  // timer could wrongly double-navigate.
+  const androidHandoff = `
+    var app = ${JSON.stringify(app)};
+    try { window.location.replace(app); } catch (e) { try { window.location.href = app; } catch (e2) {} }`
+
+  // iOS: fire the custom app scheme; if the app doesn't take over within a grace
+  // period (app not installed → scheme dead-ends silently), go to the website.
+  const iosHandoff = `
     var web = ${JSON.stringify(web)};
-    var appTarget = ${JSON.stringify(appTarget)};
+    var app = ${JSON.stringify(app)};
     var t0 = Date.now();
     var hidden = false;
     document.addEventListener('visibilitychange', function(){ if (document.hidden) hidden = true; });
     function goWeb(){ try { window.location.replace(web); } catch (e) {} }
-    // Fire the native-app link straight away.
-    try { window.location.href = appTarget; } catch (e) { goWeb(); }
-    // If the app opened, the page goes to the background (hidden) and/or JS is
-    // suspended; in that case do NOT redirect. Otherwise (app not installed),
-    // send the user to the website automatically.
+    try { window.location.href = app; } catch (e) { goWeb(); return; }
     setTimeout(function(){
       if (document.hidden || hidden) return;     // app took over
-      if (Date.now() - t0 > 1600) return;        // JS was suspended -> app opened
+      if (Date.now() - t0 > 1900) return;        // JS suspended -> app opened
       goWeb();
-    }, ${isAndroid ? 1200 : 1500});`
+    }, 1500);`
+
+  const handoff = isAndroid ? androidHandoff : iosHandoff
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
