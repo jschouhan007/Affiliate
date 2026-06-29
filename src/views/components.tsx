@@ -237,7 +237,7 @@ export function DealCard(
 
   // Strict image dimensions kill layout shift (CLS). 5:4 box → 500x400.
   const img = deal.image_url
-    ? `<img src="${deal.image_url}" alt="${deal.title}" loading="lazy" decoding="async" width="500" height="400" class="w-full h-full object-contain p-6" />`
+    ? `<img src="${deal.image_url}" alt="${deal.title}" loading="lazy" decoding="async" width="500" height="400" class="w-full h-full object-cover" />`
     : `<div class="w-full h-full flex items-center justify-center text-ink-faint"><i class="fas fa-box-open text-4xl"></i></div>`
 
   const compareBtn = opts.compare
@@ -349,8 +349,8 @@ export function RecommendationStrip(
 // Desktop: 5 cols × 4 rows = 20 per page · Mobile: 2 cols × 8 rows = 16 per page
 // All cards render server-side; sorting + pagination are handled client-side
 // in app.js (catalogue IIFE) so each page is an exact 5×4 / 2×8 block.
-// Image fit: fixed square aspect box + object-contain centers every photo
-// uniformly regardless of source dimensions.
+// Image fit: fixed square aspect box + object-cover fills every photo
+// edge-to-edge (no blank gaps) regardless of source dimensions.
 // ============================================================
 function CatalogueCard(deal: Deal, sourcePath: string): string {
   const cheapest = (deal.offers || [])

@@ -82,7 +82,7 @@ export function HomePage(data: {
         <!-- Lead story 60% -->
         <article class="lg:col-span-7 card group flex flex-col">
           <a href="/reviews/${lead.slug}" class="card-img block aspect-[16/10] bg-panel relative">
-            ${lead.image_url ? `<img src="${lead.image_url}" alt="${lead.title}" loading="eager" decoding="async" fetchpriority="high" width="640" height="400" class="w-full h-full object-contain p-10" />` : ''}
+            ${lead.image_url ? `<img src="${lead.image_url}" alt="${lead.title}" loading="eager" decoding="async" fetchpriority="high" width="640" height="400" class="w-full h-full object-cover" />` : ''}
             <span class="absolute top-5 left-5 pill pill-ink">${lead.award || "Editor's Pick"}</span>
           </a>
           <div class="p-8">
@@ -100,7 +100,7 @@ export function HomePage(data: {
           ${secondary
             .map(
               (d) => `<a href="/reviews/${d.slug}" class="group flex gap-5 items-center card p-4">
-            <div class="card-img w-28 h-28 bg-panel rounded shrink-0 overflow-hidden flex items-center justify-center">${d.image_url ? `<img src="${d.image_url}" alt="${d.title}" loading="lazy" decoding="async" width="112" height="112" class="w-full h-full object-contain p-3" />` : ''}</div>
+            <div class="card-img w-28 h-28 bg-panel rounded shrink-0 overflow-hidden flex items-center justify-center">${d.image_url ? `<img src="${d.image_url}" alt="${d.title}" loading="lazy" decoding="async" width="112" height="112" class="w-full h-full object-cover" />` : ''}</div>
             <div class="min-w-0">
               ${d.category_name ? `<div class="eyebrow text-[0.62rem] mb-1">${d.category_name}</div>` : ''}
               <h4 class="font-serif text-lg leading-snug text-ink line-clamp-2 group-hover:text-accent transition">${d.title}</h4>
