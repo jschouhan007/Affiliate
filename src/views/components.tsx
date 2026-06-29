@@ -160,10 +160,10 @@ export function HeroCarousel(deals: Deal[], sourcePath = '/'): string {
   <section class="hero-carousel" id="hero-carousel" aria-roledescription="carousel" aria-label="Featured products" data-autoplay="3000">
     <div class="hero-carousel__viewport">
       <div class="hero-carousel__track" id="hero-track">${slides}</div>
+      <div class="hero-dots" id="hero-dots" role="tablist" aria-label="Choose product">${dots}</div>
     </div>
     <button class="hero-arrow hero-arrow--prev" id="hero-prev" aria-label="Previous product"><i class="fas fa-chevron-left"></i></button>
     <button class="hero-arrow hero-arrow--next" id="hero-next" aria-label="Next product"><i class="fas fa-chevron-right"></i></button>
-    <div class="hero-dots" id="hero-dots" role="tablist" aria-label="Choose product">${dots}</div>
   </section>`
 }
 

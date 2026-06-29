@@ -869,6 +869,7 @@ input[type="checkbox"], input[type="radio"]{ accent-color: var(--accent); width:
   padding: 0 1.25rem;
 }
 .hero-carousel__viewport {
+  position: relative;         /* positioning context for the dots (over image) */
   overflow: hidden;
   border-radius: 1.75rem;
   cursor: grab;               /* desktop drag affordance */
@@ -1194,16 +1195,30 @@ a.hero-slide__eyebrow:hover { text-decoration: underline; }
   .hero-slide__body { display: none; }
   .hero-slide__mbuy { display: none !important; }
 
-  /* category caption under the card, normal-weight plain text */
+  /* The dots now live INSIDE the viewport (see markup), so they pin to the
+     bottom edge of the square IMAGE — over the picture, never over the caption
+     that sits below the card. Keep them compact on mobile. */
+  .hero-dots {
+    bottom: 0.6rem;
+    padding: 0.26rem 0.5rem;
+    gap: 0.34rem;
+  }
+
+  /* Category caption sits in its OWN row clearly below the card + dots.
+     Same font-size as before, but a more stylish refined italic serif. */
   .hero-slide__mcat {
     display: block;
     text-align: center;
-    margin: 0.7rem 0 0.2rem;
-    font-size: 0.95rem;
-    font-weight: 400;          /* normal font as requested */
+    margin: 0.85rem 0.5rem 0.25rem;
+    font-size: 0.95rem;        /* SAME size as before */
+    /* more stylish: the brand's elegant serif in a refined italic (this face +
+       its italic 500 weight are already loaded site-wide) */
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    font-weight: 500;
+    font-style: italic;
+    letter-spacing: 0.012em;
     color: var(--ink, #2a2018);
     text-decoration: none;
-    letter-spacing: 0.005em;
   }
   .hero-slide__mcat:hover { color: var(--accent, #9c3b35); }
 
